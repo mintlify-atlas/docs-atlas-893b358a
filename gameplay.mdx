@@ -1,0 +1,193 @@
+---
+title: 'Gameplay'
+description: 'Master the controls and mechanics of Super Hexagon'
+---
+
+## Objective
+
+Super Hexagon is a fast-paced reflex game where you control a small triangle navigating through incoming obstacles. Your goal is to survive as long as possible by rotating around a central hexagon while avoiding collision with the moving walls.
+
+### Scoring System
+
+Your score increases automatically as you survive:
+
+- **+1 point** every time an obstacle line passes you successfully (approximately every 12 seconds)
+- The score is tracked in real-time in the top-right corner
+- Your best score is saved and displayed on the game over screen
+
+```typescript src/components/molecules/Line/Line.tsx:46-51
+useEffect(() => {
+  const timeoutId = setTimeout(() => {
+    ref.current && ref.current.parentElement?.remove()
+    setShouldRender(false)
+    dispatch(updateScore()) // Score increases when obstacle passes
+  }, 12000)
+  setTimeoutId(timeoutId)
+}, [dispatch])
+```
+
+## Controls
+
+The game supports both keyboard and touch controls for desktop and mobile play.
+
+### Keyboard Controls (Desktop)
+
+<AccordionGroup>
+  <Accordion title="Arrow Keys">
+    - **Left Arrow (←)**: Rotate counter-clockwise
+    - **Right Arrow (→)**: Rotate clockwise
+    
+    The player rotates at 2 degrees per frame when a key is held down.
+    
+    ```typescript src/helpers/playerControllers.ts:52-59
+    if (leftHeld && el) {
+      setDegres(degres - 2)
+      el.style.transform = `rotate(${degres}deg)`
+    }
+    if (rightHeld && el) {
+      setDegres(degres + 2)
+      el.style.transform = `rotate(${degres}deg)`
+    }
+    ```
+  </Accordion>
+</AccordionGroup>
+
+<Note>
+Only one direction can be active at a time. Pressing the opposite arrow key will immediately switch rotation direction.
+</Note>
+
+### Touch Controls (Mobile)
+
+On screens smaller than 800px width, touch controls automatically appear:
+
+- **Left button** (bottom-left): Rotate counter-clockwise
+- **Right button** (bottom-right): Rotate clockwise
+
+```typescript src/components/molecules/Player/Player.tsx:69-71
+useEffect(() => {
+  setIsMobile(window.innerWidth < 800)
+}, [])
+```
+
+The mobile buttons are styled as circular controls with a black background and white border, positioned at the bottom corners of the screen.
+
+## Game Mechanics
+
+### The Playing Field
+
+The game board consists of:
+
+1. **Central Hexagon**: A rotating red hexagon at the center
+2. **Player Triangle**: Your small red triangle that orbits the hexagon
+3. **Obstacle Lines**: Orange walls that move inward from six triangular sections
+4. **Rotating Board**: The entire hexagon rotates continuously (360° every 30 seconds)
+
+```typescript src/components/organisms/Superhexagon/SuperHexagon.tsx:72-78
+<motion.div
+  ref={ref}
+  className='box relative'
+  initial={{ rotate: 0 }}
+  animate={{ rotate: 360 }}
+  transition={{ repeat: Infinity, duration: 30, ease: 'linear' }}
+>
+```
+
+### Obstacle Spawning
+
+New obstacles spawn every **1.8 seconds** (1800ms). Each spawn creates walls in 5 out of 6 triangular sections, leaving one gap for you to navigate through:
+
+```typescript src/components/organisms/Superhexagon/SuperHexagon.tsx:32-46
+const handleSpawn = useCallback(() => {
+  const randomId = Math.floor(Math.random() * 6)
+  
+  triangles.map((triangle, idx) => {
+    if (idx === randomId) return // Skip one section to create a gap
+    const div = document.createElement('div')
+    div.className = 'h-0'
+    createRoot(div).render(
+      <StoreProvider>
+        <Line audio={audio} />
+      </StoreProvider>
+    )
+    triangle.current?.appendChild(div)
+  })
+}, [triangles, audio])
+```
+
+Obstacles move inward over **12 seconds**, gradually scaling down as they approach the center.
+
+### Collision Detection
+
+The game uses a sophisticated polygon-based collision system:
+
+- Your player triangle has **3 hitbox points** at its vertices
+- Each obstacle is treated as a quadrilateral with 4 vertices
+- Collision is detected by calculating the sum of angles between hitbox points and polygon vertices
+- If the total angle equals or exceeds **360 degrees**, a collision has occurred
+
+```typescript src/components/molecules/Line/Line.tsx:110
+setIsTouching(angle1 >= 360 || angle2 >= 360 || angle3 >= 360)
+```
+
+<Warning>
+Colliding with any obstacle immediately ends the game and displays your final score.
+</Warning>
+
+## Tips for Success
+
+<AccordionGroup>
+  <Accordion title="Master the Rhythm">
+    Obstacles spawn at regular 1.8-second intervals. Learn to anticipate the pattern and position yourself for the next gap.
+  </Accordion>
+  
+  <Accordion title="Small Movements">
+    You only need to rotate enough to reach the safe gap. Over-rotating can put you in danger for the next obstacle wave.
+  </Accordion>
+  
+  <Accordion title="Watch the Rotation">
+    Remember that the entire board rotates slowly (360° in 30 seconds). Factor this into your positioning strategy.
+  </Accordion>
+  
+  <Accordion title="Stay Calm">
+    The game speeds up visually as obstacles approach, but their actual speed is constant. Don't panic—maintain smooth, controlled movements.
+  </Accordion>
+  
+  <Accordion title="Practice on Desktop First">
+    Keyboard controls offer more precise input than touch controls. Master the mechanics on desktop before attempting mobile play.
+  </Accordion>
+</AccordionGroup>
+
+## Game Over
+
+When you collide with an obstacle:
+
+1. The game immediately pauses
+2. A game-over sound effect plays (if audio is enabled)
+3. The menu screen appears showing:
+   - Your final score
+   - Your best score
+   - A leaderboard (placeholder)
+   - Options to submit your score or play again
+
+```typescript src/components/molecules/Line/Line.tsx:122-128
+useEffect(() => {
+  if (isTouching) {
+    dispatch(pause())
+    dispatch(updateBestScore())
+    isVolumeEnabled && audio.play()
+  }
+}, [audio, dispatch, isTouching, isVolumeEnabled])
+```
+
+<Tip>
+Your best score is automatically saved and persists in the Redux store, so you can always see your personal record.
+</Tip>
+
+## Audio Controls
+
+The game features:
+- **Background music** that plays during gameplay
+- **Game-over sound effect** when you collide
+- **Volume control** accessible from the menu (default: 40%)
+
+You can toggle audio on/off using the audio controller in the main menu.

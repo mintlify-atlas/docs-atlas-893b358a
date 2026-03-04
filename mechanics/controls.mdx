@@ -1,0 +1,219 @@
+---
+title: 'Player Controls'
+description: 'Learn how keyboard and touch controls work in Super Hexagon'
+icon: 'gamepad'
+---
+
+## Overview
+
+Super Hexagon implements a dual-control system supporting both keyboard inputs for desktop players and touch controls for mobile devices. The control system is built around React state management with real-time input handling.
+
+## Keyboard Controls
+
+### Arrow Key Detection
+
+The game uses two primary event handlers for keyboard input: `keyDownHandler` and `keyUpHandler`. These functions manage the state of left and right movement.
+
+<CodeGroup>
+```typescript playerControllers.ts
+export const keyDownHandler = ({
+  key,
+  setLeftHeld,
+  setRightHeld,
+}: {
+  key: string
+  setLeftHeld: (value: SetStateAction<boolean>) => void
+  setRightHeld: (value: SetStateAction<boolean>) => void
+}) => {
+  if (key === 'ArrowLeft') {
+    setLeftHeld(true)
+    setRightHeld(false)
+  }
+  if (key === 'ArrowRight') {
+    setRightHeld(true)
+    setLeftHeld(false)
+  }
+}
+```
+
+```typescript playerControllers.ts
+export const keyUpHandler = ({
+  key,
+  setLeftHeld,
+  setRightHeld,
+}: {
+  key: string
+  setLeftHeld: (value: SetStateAction<boolean>) => void
+  setRightHeld: (value: SetStateAction<boolean>) => void
+}) => {
+  if (key === 'ArrowLeft') {
+    setLeftHeld(false)
+  }
+  if (key === 'ArrowRight') {
+    setRightHeld(false)
+  }
+}
+```
+</CodeGroup>
+
+<Note>
+When a direction key is pressed, the opposite direction is automatically disabled. This prevents conflicting movement states.
+</Note>
+
+### Event Listener Setup
+
+The Player component registers global keyboard event listeners during mount and cleans them up on unmount:
+
+```typescript Player.tsx:24-38
+useEffect(() => {
+  window.addEventListener('keydown', (e) =>
+    keyDownHandler({ key: e.key, setLeftHeld, setRightHeld })
+  )
+  window.addEventListener('keyup', (e) =>
+    keyUpHandler({ key: e.key, setLeftHeld, setRightHeld })
+  )
+  return () => {
+    window.removeEventListener('keydown', (e) =>
+      keyDownHandler({ key: e.key, setLeftHeld, setRightHeld })
+    )
+    window.removeEventListener('keyup', (e) =>
+      keyUpHandler({ key: e.key, setLeftHeld, setRightHeld })
+    )
+  }
+}, [])
+```
+
+## Player Rotation
+
+### Rotation Logic
+
+The `playerController` function translates held key states into rotation transformations:
+
+```typescript playerControllers.ts:39-60
+export const playerController = ({
+  leftHeld,
+  rightHeld,
+  degres,
+  setDegres,
+  el,
+}: {
+  leftHeld: boolean
+  rightHeld: boolean
+  degres: number
+  setDegres: (value: SetStateAction<number>) => void
+  el: HTMLDivElement | null
+}) => {
+  if (leftHeld && el) {
+    setDegres(degres - 2)
+    el.style.transform = `rotate(${degres}deg)`
+  }
+  if (rightHeld && el) {
+    setDegres(degres + 2)
+    el.style.transform = `rotate(${degres}deg)`
+  }
+}
+```
+
+<Info>
+The player rotates at a rate of **2 degrees per tick**. The controller runs every 10ms via a setTimeout in the Player component.
+</Info>
+
+### Rotation Update Loop
+
+The rotation updates continuously while a key is held:
+
+```typescript Player.tsx:40-50
+useEffect(() => {
+  setTimeout(() => {
+    playerController({
+      leftHeld,
+      rightHeld,
+      degres,
+      setDegres,
+      el: ref.current,
+    })
+  }, 10)
+}, [degres, leftHeld, rightHeld])
+```
+
+## Mobile Touch Controls
+
+### Touch Button Rendering
+
+On mobile devices (screen width < 800px), the game renders two circular touch buttons:
+
+```typescript Player.tsx:69-72
+useEffect(() => {
+  setIsMobile(window.innerWidth < 800)
+}, [])
+```
+
+```typescript Player.tsx:91-112
+{isMobile && (
+  <>
+    <button
+      onTouchStart={() => {
+        keyDownHandler({ key: 'ArrowLeft', setLeftHeld, setRightHeld })
+      }}
+      onTouchEnd={() => {
+        keyUpHandler({ key: 'ArrowLeft', setLeftHeld, setRightHeld })
+      }}
+      className='fixed bottom-6 left-6 w-16 h-16 p-3 rounded-full border-2 border-white bg-black shadow-lg'
+    ></button>
+    <button
+      onTouchStart={() => {
+        keyDownHandler({ key: 'ArrowRight', setLeftHeld, setRightHeld })
+      }}
+      onTouchEnd={() => {
+        keyUpHandler({ key: 'ArrowRight', setLeftHeld, setRightHeld })
+      }}
+      className='fixed bottom-6 right-6 w-16 h-16 p-3 rounded-full border-2 border-white bg-black shadow-lg'
+    ></button>
+  </>
+)}
+```
+
+<Note>
+Touch controls reuse the same `keyDownHandler` and `keyUpHandler` functions as keyboard controls, ensuring consistent behavior across input methods.
+</Note>
+
+## State Management
+
+The control system maintains three key state variables:
+
+<Tabs>
+  <Tab title="leftHeld">
+    Boolean state tracking whether the left arrow key or left touch button is currently pressed.
+  </Tab>
+  <Tab title="rightHeld">
+    Boolean state tracking whether the right arrow key or right touch button is currently pressed.
+  </Tab>
+  <Tab title="degres">
+    Numeric state storing the current rotation angle of the player in degrees.
+  </Tab>
+</Tabs>
+
+## Position Updates
+
+As the player rotates, hitbox positions are continuously updated and dispatched to Redux:
+
+```typescript Player.tsx:52-67
+useEffect(() => {
+  const hitbox1 = {
+    x: refHitbox1.current?.getBoundingClientRect().x ?? 0,
+    y: refHitbox1.current?.getBoundingClientRect().y ?? 0,
+  }
+  const hitbox2 = {
+    x: refHitbox2.current?.getBoundingClientRect().x ?? 0,
+    y: refHitbox2.current?.getBoundingClientRect().y ?? 0,
+  }
+  const hitbox3 = {
+    x: refHitbox3.current?.getBoundingClientRect().x ?? 0,
+    y: refHitbox3.current?.getBoundingClientRect().y ?? 0,
+  }
+
+  ref.current && dispatch(updatePosition({ hitbox1, hitbox2, hitbox3 }))
+}, [degres, dispatch])
+```
+
+These hitbox positions are critical for the collision detection system.

@@ -1,0 +1,196 @@
+---
+title: 'Ray Casting'
+description: 'Point-in-polygon detection using ray casting algorithm for collision detection'
+---
+
+## Overview
+
+The ray casting utility provides an alternative collision detection method by determining if a point lies inside a polygon. This technique casts a virtual ray from the point and counts how many times it intersects the polygon's edges. The function is marked as deprecated in the current codebase.
+
+<Warning>
+  This function is marked as **DEPRECATED** in the source code. The game currently uses angle-based collision detection instead. See [Collision Controllers](/components/collision-controllers) for the active collision system.
+</Warning>
+
+## Core Function
+
+### isPointInsidePolygon
+
+Determines whether a point is inside a quadrilateral polygon using the ray casting algorithm. The function casts a ray to the right from the test point and counts edge intersections.
+
+<ParamField path="polyX1" type="number" required>
+  X coordinate of the first polygon vertex
+</ParamField>
+
+<ParamField path="polyY1" type="number" required>
+  Y coordinate of the first polygon vertex
+</ParamField>
+
+<ParamField path="polyX2" type="number" required>
+  X coordinate of the second polygon vertex
+</ParamField>
+
+<ParamField path="polyY2" type="number" required>
+  Y coordinate of the second polygon vertex
+</ParamField>
+
+<ParamField path="polyX3" type="number" required>
+  X coordinate of the third polygon vertex
+</ParamField>
+
+<ParamField path="polyY3" type="number" required>
+  Y coordinate of the third polygon vertex
+</ParamField>
+
+<ParamField path="polyX4" type="number" required>
+  X coordinate of the fourth polygon vertex
+</ParamField>
+
+<ParamField path="polyY4" type="number" required>
+  Y coordinate of the fourth polygon vertex
+</ParamField>
+
+<ParamField path="pointX" type="number" required>
+  X coordinate of the point to test
+</ParamField>
+
+<ParamField path="pointY" type="number" required>
+  Y coordinate of the point to test
+</ParamField>
+
+<ResponseField name="isInside" type="boolean">
+  Returns `true` if the point is inside the polygon, `false` otherwise
+</ResponseField>
+
+```typescript
+import { isPointInsidePolygon } from '~/helpers/rayCasting'
+
+// Check if player position is inside obstacle
+const playerInside = isPointInsidePolygon(
+  100, 100,  // Vertex 1
+  300, 100,  // Vertex 2
+  300, 300,  // Vertex 3
+  100, 300,  // Vertex 4
+  250, 250   // Player position
+)
+
+if (playerInside) {
+  console.log('Collision detected!')
+}
+```
+
+## Ray Casting Algorithm
+
+The algorithm works through these steps:
+
+### 1. Convert to Polygon Array
+
+The eight individual vertex coordinates are converted into an array of coordinate objects:
+
+```typescript
+const polygon = [
+  { x: polyX1, y: polyY1 },
+  { x: polyX2, y: polyY2 },
+  { x: polyX3, y: polyY3 },
+  { x: polyX4, y: polyY4 },
+]
+```
+
+### 2. Edge-Left Test
+
+The `isLeftOfEdge` helper function determines if a point is to the left of a line segment using the cross product:
+
+```typescript
+function isLeftOfEdge(
+  start: Coordinates,
+  end: Coordinates,
+  point: Coordinates
+) {
+  return (
+    (end.x - start.x) * (point.y - start.y) -
+    (end.y - start.y) * (point.x - start.x) > 0
+  )
+}
+```
+
+### 3. Ray Intersection Count
+
+The algorithm iterates through each edge of the polygon and counts intersections with a horizontal ray extending to the right from the test point:
+
+```typescript
+let count = 0
+for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+  if (
+    polygon[i].y > pointY !== polygon[j].y > pointY &&
+    pointX < ((polygon[j].x - polygon[i].x) * (pointY - polygon[i].y)) /
+             (polygon[j].y - polygon[i].y) + polygon[i].x
+  ) {
+    if (isLeftOfEdge(polygon[i], polygon[j], { x: pointX, y: pointY })) {
+      count++
+    }
+  }
+}
+```
+
+### 4. Odd-Even Rule
+
+If the number of intersections is odd, the point is inside the polygon:
+
+```typescript
+return count % 2 !== 0
+```
+
+## Mathematical Explanation
+
+### Cross Product for Edge Testing
+
+The cross product formula determines which side of a line a point is on:
+
+```
+crossProduct = (end.x - start.x) × (point.y - start.y) - (end.y - start.y) × (point.x - start.x)
+```
+
+- **Positive**: Point is to the left of the edge
+- **Zero**: Point is on the edge
+- **Negative**: Point is to the right of the edge
+
+### Ray-Edge Intersection
+
+For a horizontal ray extending right from the point, an intersection occurs when:
+
+1. The edge crosses the horizontal line at `pointY`
+2. The intersection point is to the right of `pointX`
+
+This is computed using linear interpolation:
+
+```
+intersectionX = ((j.x - i.x) × (pointY - i.y)) / (j.y - i.y) + i.x
+```
+
+## Why It's Deprecated
+
+The codebase moved away from ray casting in favor of the angle-based method in `collisionControllers.ts` for several potential reasons:
+
+1. **Performance**: Angle-based detection may be more efficient for the game's specific use case
+2. **Precision**: The angle sum method provides a continuous value that can be used for near-miss detection
+3. **Simplicity**: The angle approach is more straightforward for debugging and understanding
+
+## Type Definitions
+
+```typescript
+type Coordinates = {
+  x: number
+  y: number
+}
+```
+
+## Comparison with Angle-Based Detection
+
+| Feature | Ray Casting | Angle-Based |
+|---------|-------------|-------------|
+| **Result Type** | Boolean (in/out) | Number (0-360°) |
+| **Precision** | Binary | Continuous |
+| **Performance** | O(n) edges | O(n) vertices |
+| **Current Status** | Deprecated | Active |
+| **Use Case** | General polygons | Quadrilaterals |
+
+For current collision detection, use the [handleCollision](/components/collision-controllers#handlecollision) function from the Collision Controllers module.

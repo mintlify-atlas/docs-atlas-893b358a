@@ -1,0 +1,376 @@
+---
+title: 'Line'
+description: 'Animated obstacle component with collision detection, scoring integration, and automatic cleanup'
+---
+
+## Overview
+
+The Line component renders individual obstacle barriers in Super Hexagon. Each Line animates toward the center of the board, checks for collisions with the player's hitboxes, updates the score when successfully avoided, and triggers game-over logic on collision.
+
+## Component Structure
+
+The Line component is located at `src/components/molecules/Line/Line.tsx` and implements:
+
+- Framer Motion animation (12-second linear movement)
+- Four-vertex collision detection system
+- Redux integration for player hitbox positions
+- Automatic score updates on successful avoidance
+- Game-over handling with audio playback
+- Self-cleanup after animation completion
+
+## Props
+
+<ParamField path="audio" type="HTMLAudioElement" required>
+  Audio element to play on collision (game-over sound effect). Respects the global volume setting from Redux state.
+</ParamField>
+
+## Implementation
+
+### Component Definition
+
+```tsx
+import { motion } from 'framer-motion'
+import { useEffect, useRef, useState } from 'react'
+import { useDispatch, useSelector } from 'react-redux'
+import { handleCollision } from '~helpers/collisionControllers'
+
+type LineProps = {
+  audio: HTMLAudioElement
+}
+
+export const Line = ({ audio }: LineProps) => {
+  const dispatch = useDispatch()
+  const ref = useRef<HTMLDivElement>(null)
+
+  const refVertix1 = useRef<HTMLDivElement>(null)
+  const refVertix2 = useRef<HTMLDivElement>(null)
+  const refVertix3 = useRef<HTMLDivElement>(null)
+  const refVertix4 = useRef<HTMLDivElement>(null)
+
+  // Component logic...
+}
+```
+
+### Redux State
+
+The component consumes multiple Redux selectors:
+
+```tsx
+const hitbox1 = useSelector(selectPlayerH1)
+const hitbox2 = useSelector(selectPlayerH2)
+const hitbox3 = useSelector(selectPlayerH3)
+const boardAngle = +useSelector(selectAngle)
+const playerIntervalId = useSelector(selectPlayerIntervalId)
+const spawnIntervalId = useSelector(selectSpawnIntervalId)
+const isPlaying = useSelector(selectIsPLaying)
+const isVolumeEnabled = useSelector(selectIsVolumeEnabled)
+```
+
+### Local State
+
+<ParamField path="isTouching" type="boolean" default="false">
+  Tracks whether the Line is currently colliding with any player hitbox
+</ParamField>
+
+<ParamField path="shouldRender" type="boolean" default="true">
+  Controls component visibility. Set to false after timeout to trigger cleanup
+</ParamField>
+
+<ParamField path="timeoutId" type="NodeJS.Timeout | undefined">
+  Stores the timeout ID for cleanup and cancellation when game pauses
+</ParamField>
+
+## Animation
+
+### Framer Motion Configuration
+
+The Line uses Framer Motion for smooth animation:
+
+```tsx
+<motion.div
+  ref={ref}
+  initial={{ y: 0 }}
+  animate={{ y: 255, scaleY: 0.2, scaleX: 0 }}
+  transition={{ duration: 12, ease: 'linear' }}
+  className='relative w-full h-3 bg-orange-500'
+>
+  {/* Vertex markers */}
+</motion.div>
+```
+
+**Animation Properties:**
+- **y: 0 → 255**: Moves toward the center of the hexagonal board
+- **scaleY: 1 → 0.2**: Shrinks vertically to create perspective effect
+- **scaleX: 1 → 0**: Narrows horizontally as it approaches center
+- **duration: 12s**: Complete animation cycle takes 12 seconds
+- **ease: 'linear'**: Constant speed throughout animation
+
+### Automatic Cleanup
+
+The Line removes itself after animation completes:
+
+```tsx
+useEffect(() => {
+  const timeoutId = setTimeout(() => {
+    ref.current && ref.current.parentElement?.remove()
+    setShouldRender(false)
+    dispatch(updateScore())
+  }, 12000)
+  setTimeoutId(timeoutId)
+}, [dispatch])
+```
+
+When the 12-second timeout completes:
+1. Parent element is removed from DOM
+2. `shouldRender` set to false
+3. Score is incremented (player successfully avoided the obstacle)
+
+## Collision Detection
+
+### Four-Vertex System
+
+Each Line has four invisible vertex markers positioned at its corners:
+
+```tsx
+<div
+  ref={refVertix1}
+  className='absolute w-[1px] h-[1px] top-0 left-0'
+></div>
+<div
+  ref={refVertix2}
+  className='absolute w-[1px] h-[1px] bottom-0 left-[2px]'
+></div>
+<div
+  ref={refVertix3}
+  className='absolute w-[1px] h-[1px] top-0 right-0'
+></div>
+<div
+  ref={refVertix4}
+  className='absolute w-[1px] h-[1px] bottom-0 right-[2px]'
+></div>
+```
+
+These vertices define the polygon boundary for collision checking.
+
+### Collision Algorithm
+
+The component checks all three player hitboxes against the Line's polygon:
+
+```tsx
+useEffect(() => {
+  if (
+    ref.current &&
+    refVertix1.current &&
+    refVertix2.current &&
+    refVertix3.current &&
+    refVertix4.current
+  ) {
+    const polyX1 = refVertix1.current.getBoundingClientRect()?.x
+    const polyY1 = refVertix1.current.getBoundingClientRect()?.y
+    const polyX2 = refVertix2.current.getBoundingClientRect()?.x
+    const polyY2 = refVertix2.current.getBoundingClientRect()?.y
+    const polyX3 = refVertix3.current.getBoundingClientRect()?.x
+    const polyY3 = refVertix3.current.getBoundingClientRect()?.y
+    const polyX4 = refVertix4.current.getBoundingClientRect()?.x
+    const polyY4 = refVertix4.current.getBoundingClientRect()?.y
+
+    const angle1 = handleCollision(
+      polyX1, polyY1, polyX2, polyY2,
+      polyX3, polyY3, polyX4, polyY4,
+      hitbox1?.x ?? 0, hitbox1?.y ?? 0
+    )
+
+    const angle2 = handleCollision(
+      polyX1, polyY1, polyX2, polyY2,
+      polyX3, polyY3, polyX4, polyY4,
+      hitbox2?.x ?? 0, hitbox2?.y ?? 0
+    )
+
+    const angle3 = handleCollision(
+      polyX1, polyY1, polyX2, polyY2,
+      polyX3, polyY3, polyX4, polyY4,
+      hitbox3?.x ?? 0, hitbox3?.y ?? 0
+    )
+
+    setIsTouching(angle1 >= 360 || angle2 >= 360 || angle3 >= 360)
+  }
+}, [
+  hitbox1?.x, hitbox1?.y,
+  hitbox2?.x, hitbox2?.y,
+  hitbox3?.x, hitbox3?.y,
+  boardAngle,
+])
+```
+
+The effect runs whenever:
+- Any player hitbox position changes
+- The board rotation angle changes
+
+### Collision Handler
+
+From `src/helpers/collisionControllers.ts:3`:
+
+```tsx
+export const handleCollision = (
+  polyX1: number, polyY1: number,
+  polyX2: number, polyY2: number,
+  polyX3: number, polyY3: number,
+  polyX4: number, polyY4: number,
+  hitboX: number, hitboY: number
+) => {
+  const angle1 = getAngle(
+    { x: polyX1, y: polyY1 },
+    { x: hitboX, y: hitboY },
+    { x: polyX2, y: polyY2 }
+  )
+  const angle2 = getAngle(
+    { x: polyX2, y: polyY2 },
+    { x: hitboX, y: hitboY },
+    { x: polyX3, y: polyY3 }
+  )
+  const angle3 = getAngle(
+    { x: polyX3, y: polyY3 },
+    { x: hitboX, y: hitboY },
+    { x: polyX4, y: polyY4 }
+  )
+  const angle4 = getAngle(
+    { x: polyX4, y: polyY4 },
+    { x: hitboX, y: hitboY },
+    { x: polyX1, y: polyY1 }
+  )
+
+  const totalAngle = angle1 + angle2 + angle3 + angle4
+  return totalAngle
+}
+```
+
+The function calculates interior angles between the hitbox point and each pair of polygon vertices. If the total angle equals 360 degrees, the point is inside the polygon (collision detected).
+
+### Angle Calculation
+
+From `src/helpers/collisionControllers.ts:41`:
+
+```tsx
+export const getAngle = (A: Position, B: Position, C: Position) => {
+  var AB = Math.sqrt(Math.pow(B.x - A.x, 2) + Math.pow(B.y - A.y, 2))
+  var BC = Math.sqrt(Math.pow(B.x - C.x, 2) + Math.pow(B.y - C.y, 2))
+  var AC = Math.sqrt(Math.pow(C.x - A.x, 2) + Math.pow(C.y - A.y, 2))
+
+  return (
+    Math.acos((BC * BC + AB * AB - AC * AC) / (2 * BC * AB)) * (180 / Math.PI)
+  )
+}
+```
+
+Uses the law of cosines to calculate the angle at point B formed by points A, B, and C.
+
+## Game-Over Logic
+
+### Collision Response
+
+When a collision is detected:
+
+```tsx
+useEffect(() => {
+  if (isTouching) {
+    dispatch(pause())
+    dispatch(updateBestScore())
+    isVolumeEnabled && audio.play()
+  }
+}, [audio, dispatch, isTouching, isVolumeEnabled])
+```
+
+**Actions on collision:**
+1. Pause the game (`dispatch(pause())`)
+2. Update best score if current score is higher (`dispatch(updateBestScore())`)
+3. Play collision audio if volume is enabled
+
+### Cleanup on Pause
+
+When the game pauses, all intervals and timeouts are cleared:
+
+```tsx
+useEffect(() => {
+  if (!isPlaying) {
+    clearTimeout(timeoutId)
+    clearInterval(playerIntervalId)
+    clearInterval(spawnIntervalId)
+  }
+}, [isPlaying, playerIntervalId, spawnIntervalId, timeoutId])
+```
+
+This prevents Lines from continuing to update after game-over.
+
+### Conditional Rendering
+
+```tsx
+if (!shouldRender || !isPlaying) return null
+```
+
+The Line only renders when:
+- `shouldRender` is true (hasn't been cleaned up)
+- `isPlaying` is true (game is active)
+
+## Usage
+
+```tsx
+import { Line } from '~components/molecules/Line/Line'
+
+function GameBoard() {
+  const collisionAudio = new Audio('/sounds/collision.mp3')
+
+  return (
+    <div className="obstacle-container">
+      <Line audio={collisionAudio} />
+    </div>
+  )
+}
+```
+
+### Spawning Multiple Lines
+
+Typically, Lines are spawned at intervals:
+
+```tsx
+const spawnInterval = setInterval(() => {
+  const lineContainer = document.createElement('div')
+  lineContainer.className = 'line-wrapper'
+  
+  const root = createRoot(lineContainer)
+  root.render(<Line audio={collisionAudio} />)
+  
+  gameBoard.appendChild(lineContainer)
+}, 2000) // Spawn every 2 seconds
+```
+
+## Styling
+
+The Line has a base appearance:
+
+```tsx
+className='relative w-full h-3 bg-orange-500'
+```
+
+- **w-full**: Full width of container
+- **h-3**: 12px height
+- **bg-orange-500**: Orange color (customizable via Tailwind)
+- **relative**: Positions vertex markers absolutely within
+
+## Key Features
+
+- **Self-Contained**: Each Line manages its own lifecycle and cleanup
+- **Precise Collision**: Four-vertex polygon detection with three player hitboxes (12 collision checks)
+- **Performance**: Only checks collisions when player position or board angle changes
+- **Audio Integration**: Respects global volume settings
+- **Automatic Scoring**: Updates score on successful avoidance without parent component intervention
+
+## Related Components
+
+- [Player](/components/player) - Provides hitbox positions consumed by Line
+- [SuperHexagon](/components/superhexagon) - Parent container that spawns Lines at intervals
+
+## Performance Considerations
+
+- Uses `getBoundingClientRect()` which triggers layout calculations. The effect dependencies ensure this only runs when necessary.
+- The 12-second duration balances visual smoothness with gameplay difficulty
+- Self-cleanup prevents memory leaks from accumulated DOM nodes

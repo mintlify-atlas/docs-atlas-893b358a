@@ -1,0 +1,192 @@
+---
+title: 'Audio'
+description: 'Background music playback component with volume control integration'
+---
+
+## Overview
+
+The Audio component manages background music playback for the Super Hexagon game. It automatically plays the game's background music on loop and integrates with the Redux volume state to control playback volume. The component conditionally renders based on whether volume is enabled.
+
+## Components
+
+### Audio
+
+The main audio playback component that renders an HTML5 `<audio>` element with automatic playback.
+
+**Location:** `src/components/atoms/Audio/Audio.tsx:6`
+
+#### Implementation
+
+```tsx
+import { useEffect, useRef } from 'react'
+import { useSelector } from 'react-redux'
+import { selectIsVolumeEnabled, selectVolume } from '~redux/selectors/volume'
+
+export const Audio = () => {
+  const ref = useRef<HTMLAudioElement>(null)
+  const volume = useSelector(selectVolume)
+  const isVolumeEnabled = useSelector(selectIsVolumeEnabled)
+
+  useEffect(() => {
+    if (ref.current) ref.current.volume = volume
+  }, [volume])
+
+  if (!isVolumeEnabled) return null
+
+  return (
+    <audio ref={ref} autoPlay>
+      <source
+        src={`${process.env.NEXT_PUBLIC_HOST}/audio.mp3`}
+        type='audio/mpeg'
+      />
+    </audio>
+  )
+}
+```
+
+#### Props
+
+This component accepts no props. All configuration is managed through Redux state.
+
+#### Redux Integration
+
+The component uses two Redux selectors from `src/redux/selectors/volume.ts`:
+
+<ParamField path="volume" type="number">
+  The current volume level (0-1 range). Defaults to 0.4 in the game state.
+</ParamField>
+
+<ParamField path="isVolumeEnabled" type="boolean">
+  Computed boolean indicating if volume is greater than 0. When false, the component returns null.
+</ParamField>
+
+#### Behavior
+
+- **Auto-play**: The audio element has the `autoPlay` attribute, starting playback immediately when rendered
+- **Volume synchronization**: Uses `useEffect` to update the audio element's volume whenever the Redux volume state changes
+- **Conditional rendering**: Only renders when `isVolumeEnabled` is true (volume > 0)
+- **Audio source**: Loads `audio.mp3` from the host defined in `NEXT_PUBLIC_HOST` environment variable
+
+### AudioController
+
+A UI control button that allows users to toggle audio on/off.
+
+**Location:** `src/components/atoms/Audio/AudioController.tsx:6`
+
+#### Implementation
+
+```tsx
+import { useDispatch, useSelector } from 'react-redux'
+import { selectIsVolumeEnabled, selectVolume } from '~redux/selectors/volume'
+import { BiSolidVolumeFull, BiSolidVolumeMute } from 'react-icons/bi'
+import { switchVolume } from '~redux/slices/game'
+
+export const AudioController = () => {
+  const dispatch = useDispatch()
+  const isVolumeEnabled = useSelector(selectIsVolumeEnabled)
+  const volume = useSelector(selectVolume)
+
+  const handleSwithVolume = () => {
+    dispatch(switchVolume(volume === 0 ? 0.4 : 0))
+  }
+
+  return (
+    <button
+      className='absolute bottom-3 right-3 md:bottom-10 md:right-14 drop-shadow-[1px_1px_8px_rgba(255,153,204,1)]'
+      onClick={handleSwithVolume}
+    >
+      {isVolumeEnabled ? (
+        <BiSolidVolumeFull size={32} />
+      ) : (
+        <BiSolidVolumeMute size={32} />
+      )}
+    </button>
+  )
+}
+```
+
+#### Props
+
+This component accepts no props.
+
+#### Styling
+
+The button is positioned absolutely in the bottom-right corner with responsive positioning:
+- Mobile: `bottom-3 right-3`
+- Desktop (md+): `bottom-10 right-14`
+- Pink glow shadow effect: `drop-shadow-[1px_1px_8px_rgba(255,153,204,1)]`
+
+#### Toggle Logic
+
+The `handleSwithVolume` function implements binary volume toggling:
+- If volume is 0 (muted): Sets volume to 0.4
+- If volume is greater than 0: Sets volume to 0
+
+This dispatches the `switchVolume` action from `src/redux/slices/game.ts:42`.
+
+## Redux State Structure
+
+The audio system relies on the game slice state:
+
+```typescript
+type PlayerState = {
+  // ... other fields
+  volume: number // 0-1 range, defaults to 0.4
+}
+```
+
+### Selectors
+
+**selectVolume** (`src/redux/selectors/volume.ts:6`):
+```typescript
+export const selectVolume = createSelector(
+  selectVolumeState,
+  (volume) => volume
+)
+```
+
+**selectIsVolumeEnabled** (`src/redux/selectors/volume.ts:11`):
+```typescript
+export const selectIsVolumeEnabled = createSelector(
+  selectVolumeState,
+  (volume) => volume > 0
+)
+```
+
+### Actions
+
+**switchVolume** (`src/redux/slices/game.ts:42`):
+```typescript
+switchVolume: (state, action: PayloadAction<number>) => {
+  state.volume = action.payload
+}
+```
+
+## Usage Example
+
+Typically, both components are used together in the main game layout:
+
+```tsx
+import { Audio } from '~components/atoms/Audio/Audio'
+import { AudioController } from '~components/atoms/Audio/AudioController'
+
+export const GameLayout = () => {
+  return (
+    <div>
+      <Audio />
+      <AudioController />
+      {/* Other game components */}
+    </div>
+  )
+}
+```
+
+## Environment Configuration
+
+Ensure you have the `NEXT_PUBLIC_HOST` environment variable configured to point to your audio assets:
+
+```bash
+NEXT_PUBLIC_HOST=https://your-domain.com
+```
+
+The audio file should be located at `{NEXT_PUBLIC_HOST}/audio.mp3`.

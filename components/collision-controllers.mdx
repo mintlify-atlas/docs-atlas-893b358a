@@ -1,0 +1,172 @@
+---
+title: 'Collision Controllers'
+description: 'Detect collisions between the player and game obstacles using angle-based detection'
+---
+
+## Overview
+
+The collision controllers use mathematical angle calculations to determine if a point (the player's hitbox) is inside a quadrilateral polygon (an obstacle). This approach calculates the angles formed between the point and each vertex of the polygon, summing them to detect collision.
+
+## Core Functions
+
+### handleCollision
+
+Determines if a point collides with a quadrilateral by calculating the sum of angles formed between the point and each vertex pair.
+
+<ParamField path="polyX1" type="number" required>
+  X coordinate of the first vertex
+</ParamField>
+
+<ParamField path="polyY1" type="number" required>
+  Y coordinate of the first vertex
+</ParamField>
+
+<ParamField path="polyX2" type="number" required>
+  X coordinate of the second vertex
+</ParamField>
+
+<ParamField path="polyY2" type="number" required>
+  Y coordinate of the second vertex
+</ParamField>
+
+<ParamField path="polyX3" type="number" required>
+  X coordinate of the third vertex
+</ParamField>
+
+<ParamField path="polyY3" type="number" required>
+  Y coordinate of the third vertex
+</ParamField>
+
+<ParamField path="polyX4" type="number" required>
+  X coordinate of the fourth vertex
+</ParamField>
+
+<ParamField path="polyY4" type="number" required>
+  Y coordinate of the fourth vertex
+</ParamField>
+
+<ParamField path="hitboX" type="number" required>
+  X coordinate of the hitbox point to test
+</ParamField>
+
+<ParamField path="hitboY" type="number" required>
+  Y coordinate of the hitbox point to test
+</ParamField>
+
+<ResponseField name="totalAngle" type="number">
+  The sum of all four angles in degrees. If the point is inside the polygon, this value will be approximately 360 degrees
+</ResponseField>
+
+```typescript
+import { handleCollision } from '~/helpers/collisionControllers'
+
+// Check if player at (250, 250) collides with obstacle
+const totalAngle = handleCollision(
+  100, 100,  // Vertex 1
+  300, 100,  // Vertex 2
+  300, 300,  // Vertex 3
+  100, 300,  // Vertex 4
+  250, 250   // Player hitbox position
+)
+
+// Total angle near 360° indicates collision
+const isColliding = Math.abs(totalAngle - 360) < 1
+```
+
+### getAngle
+
+Calculates the angle formed by three points (A, B, C) using the law of cosines. This function computes the angle at point B.
+
+<ParamField path="A" type="Position" required>
+  First position object with `x` and `y` coordinates
+</ParamField>
+
+<ParamField path="B" type="Position" required>
+  Second position object with `x` and `y` coordinates (vertex of the angle)
+</ParamField>
+
+<ParamField path="C" type="Position" required>
+  Third position object with `x` and `y` coordinates
+</ParamField>
+
+<ResponseField name="angle" type="number">
+  The angle at point B in degrees
+</ResponseField>
+
+```typescript
+import { getAngle } from '~/helpers/collisionControllers'
+
+const angle = getAngle(
+  { x: 100, y: 100 },  // Point A
+  { x: 250, y: 250 },  // Point B (vertex)
+  { x: 300, y: 100 }   // Point C
+)
+
+console.log(`Angle at B: ${angle}°`)
+```
+
+## Mathematical Approach
+
+The collision detection works by:
+
+1. **Calculating distances** between points using the Pythagorean theorem:
+   - `AB = √((Bx - Ax)² + (By - Ay)²)`
+   - `BC = √((Bx - Cx)² + (By - Cy)²)`
+   - `AC = √((Cx - Ax)² + (Cy - Ay)²)`
+
+2. **Applying the law of cosines** to find the angle:
+   - `angle = arccos((BC² + AB² - AC²) / (2 × BC × AB))`
+
+3. **Converting to degrees**: Multiply the radian result by `180/π`
+
+4. **Summing all angles**: If a point is inside a quadrilateral, the sum of angles formed with each vertex pair equals 360°
+
+## Deprecated Functions
+
+The following vertex calculation functions are marked as deprecated but remain in the codebase:
+
+- `getVerticesRT()` - Calculates vertices for right-top orientation
+- `getVerticesLB()` - Calculates vertices for left-bottom orientation
+- `getVerticesRB()` - Calculates vertices for right-bottom orientation
+- `getVerticesLT()` - Calculates vertices for left-top orientation
+
+These functions convert rectangular bounds and rotation angles into polygon vertices using trigonometric calculations. They are no longer actively used but provide context for the collision system's evolution.
+
+## Type Definitions
+
+```typescript
+type Position = {
+  x: number
+  y: number
+}
+```
+
+## Usage in Game Loop
+
+You typically call `handleCollision` every frame to check if the player has hit an obstacle:
+
+```typescript
+const checkObstacleCollision = (
+  obstacle: Obstacle,
+  playerX: number,
+  playerY: number
+) => {
+  const totalAngle = handleCollision(
+    obstacle.vertices.x1,
+    obstacle.vertices.y1,
+    obstacle.vertices.x2,
+    obstacle.vertices.y2,
+    obstacle.vertices.x3,
+    obstacle.vertices.y3,
+    obstacle.vertices.x4,
+    obstacle.vertices.y4,
+    playerX,
+    playerY
+  )
+  
+  // Collision detected if angle sum is close to 360°
+  if (Math.abs(totalAngle - 360) < 1) {
+    gameOver()
+  }
+}
+```

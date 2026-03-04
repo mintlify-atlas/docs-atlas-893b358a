@@ -1,0 +1,193 @@
+---
+title: 'Score'
+description: 'Real-time score display component that reads from Redux game state'
+---
+
+## Overview
+
+The Score component displays the player's current score in the Super Hexagon game. It reads the score value from Redux state and applies a transformation to display it as a user-facing score. The component is positioned in the top-right corner of the game screen with a distinctive border and shadow styling.
+
+## Component
+
+**Location:** `src/components/atoms/Score/Score.tsx:4`
+
+### Implementation
+
+```tsx
+import { useSelector } from 'react-redux'
+import { selectScore } from '~redux/selectors/score'
+
+export const Score = () => {
+  const score = useSelector(selectScore)
+  return (
+    <div className='fixed w-14 h-14 top-3 right-3 text-3xl text-center p-2 shadow-lg bg-black border-2 border-white rounded-md text-white'>
+      {score}
+    </div>
+  )
+}
+```
+
+### Props
+
+This component accepts no props. The score value is retrieved directly from Redux state.
+
+### Styling
+
+The component uses a fixed position layout with the following characteristics:
+
+<ParamField path="Position" type="fixed">
+  Fixed positioning at `top-3 right-3` (12px from top and right edges)
+</ParamField>
+
+<ParamField path="Dimensions" type="string">
+  Square container: `w-14 h-14` (56px × 56px)
+</ParamField>
+
+<ParamField path="Typography" type="string">
+  Large centered text: `text-3xl text-center text-white`
+</ParamField>
+
+<ParamField path="Background" type="string">
+  Black background with white border: `bg-black border-2 border-white rounded-md`
+</ParamField>
+
+<ParamField path="Effects" type="string">
+  Box shadow for depth: `shadow-lg`
+</ParamField>
+
+## Redux Integration
+
+The Score component integrates with the Redux store through a selector that transforms the raw score value.
+
+### State Structure
+
+The score is stored in the game slice (`src/redux/slices/game.ts:17`):
+
+```typescript
+type PlayerState = {
+  isPLaying: boolean
+  player: {
+    hitbox1: Position | null
+    hitbox2: Position | null
+    hitbox3: Position | null
+  }
+  angle: string
+  score: number  // Raw score value, increments by 1
+  bestScore?: number
+  spawnIntervalId?: NodeJS.Timer
+  playerIntervalId?: NodeJS.Timer
+  volume: number
+}
+
+const initialState: PlayerState = {
+  isPLaying: false,
+  player: { hitbox1: null, hitbox2: null, hitbox3: null },
+  angle: '0',
+  score: 0,  // Starts at 0
+  volume: 0.4,
+}
+```
+
+### Selector
+
+**selectScore** (`src/redux/selectors/score.ts:7`):
+
+```typescript
+import { createSelector } from '@reduxjs/toolkit'
+import { RootState } from '~redux/store'
+
+const selectScoreState = (state: RootState) => state.game.score
+
+export const selectScore = createSelector(selectScoreState, (score) =>
+  Math.floor(score / 5)
+)
+```
+
+#### Score Transformation
+
+The selector applies a division and floor operation:
+- **Raw score**: Incremented by 1 on each update (via `updateScore` action)
+- **Displayed score**: `Math.floor(score / 5)`
+- **Effect**: The displayed score updates once for every 5 raw score increments
+
+For example:
+- Raw score 0-4 → Displays 0
+- Raw score 5-9 → Displays 1
+- Raw score 10-14 → Displays 2
+- Raw score 25 → Displays 5
+
+### Actions
+
+**updateScore** (`src/redux/slices/game.ts:67`):
+
+```typescript
+updateScore: (state) => {
+  state.score += 1
+}
+```
+
+This action increments the raw score by 1. It's typically called in game loop intervals or when the player survives certain game events.
+
+**resetGame** (`src/redux/slices/game.ts:73`):
+
+```typescript
+resetGame: (state) => {
+  state.player = { hitbox1: null, hitbox2: null, hitbox3: null }
+  state.angle = '0'
+  state.score = 0  // Resets score to 0
+}
+```
+
+This action resets the score to 0 when starting a new game.
+
+## Usage Example
+
+Include the Score component in your game layout to display the current score:
+
+```tsx
+import { Score } from '~components/atoms/Score/Score'
+
+export const GameScreen = () => {
+  return (
+    <div className='relative w-full h-screen'>
+      <Score />
+      {/* Other game components */}
+    </div>
+  )
+}
+```
+
+## Score Update Pattern
+
+To increment the score during gameplay, dispatch the `updateScore` action:
+
+```tsx
+import { useDispatch } from 'react-redux'
+import { updateScore } from '~redux/slices/game'
+
+const GameLogic = () => {
+  const dispatch = useDispatch()
+  
+  // In your game loop or event handler
+  useEffect(() => {
+    const interval = setInterval(() => {
+      dispatch(updateScore())
+    }, 100) // Increment every 100ms
+    
+    return () => clearInterval(interval)
+  }, [])
+}
+```
+
+## Visual Design
+
+The Score component features a minimalist design that ensures visibility without obstructing gameplay:
+
+- Fixed 56×56px square container
+- High contrast: white text on black background with white border
+- Positioned safely in top-right corner (12px margins)
+- Large text (3xl) for easy readability during fast-paced gameplay
+- Subtle shadow effect for depth
+- Rounded corners for softer appearance
+
+The compact square design allows the score to remain visible while maximizing the playable area for the hexagonal game field.

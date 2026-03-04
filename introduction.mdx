@@ -1,0 +1,226 @@
+---
+title: Introduction
+description: Welcome to Super Hexagon - a browser-based recreation of the classic arcade game
+mode: custom
+---
+
+<div className="relative w-full overflow-hidden py-20 bg-gradient-to-br from-[#f5914a] via-[#ff6b35] to-[#de0000]">
+  <div className="absolute inset-0 bg-black/20"></div>
+  <div className="relative max-w-7xl mx-auto px-6 lg:px-8">
+    <div className="text-center">
+      <h1 className="text-5xl sm:text-6xl lg:text-7xl font-bold text-white mb-6">
+        Super Hexagon
+      </h1>
+      <p className="text-xl sm:text-2xl text-white/90 max-w-3xl mx-auto mb-10">
+        A browser-based recreation of the classic arcade game built with Next.js, React, and Framer Motion
+      </p>
+      <div className="flex flex-wrap items-center justify-center gap-4">
+        <a
+          href="/quickstart"
+          className="inline-flex items-center px-6 py-3 text-base font-semibold text-gray-900 bg-white rounded-lg hover:bg-gray-100 transition-colors"
+        >
+          Get Started
+        </a>
+        <a
+          href="/gameplay"
+          className="inline-flex items-center px-6 py-3 text-base font-semibold text-white border-2 border-white/30 bg-white/10 rounded-lg hover:bg-white/20 transition-colors"
+        >
+          Learn Gameplay
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div className="mt-16 mb-16 max-w-5xl mx-auto px-6">
+  <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-4">
+    What is Super Hexagon?
+  </h2>
+  <p className="text-base text-gray-600 dark:text-gray-400 mb-12">
+    Super Hexagon is a fast-paced, reaction-based arcade game where you control a small triangle rotating around a central hexagon. Your goal is to avoid incoming obstacles by rotating left or right while the hexagon continuously spins. This project recreates the intense gameplay experience using modern web technologies.
+  </p>
+
+  <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-4 mt-16">
+    Quick Start
+  </h2>
+  <p className="text-base text-gray-600 dark:text-gray-400 mb-8">
+    Get up and running with Super Hexagon in minutes
+  </p>
+
+  <Steps>
+    <Step title="Clone the repository">
+      Clone the Super Hexagon repository to your local machine:
+
+      ```bash
+      git clone https://github.com/miguelean/super-hexagon.git
+      cd super-hexagon
+      ```
+    </Step>
+
+    <Step title="Install dependencies">
+      Install the required packages using your preferred package manager:
+
+      <CodeGroup>
+      ```bash npm
+      npm install
+      ```
+
+      ```bash yarn
+      yarn install
+      ```
+
+      ```bash pnpm
+      pnpm install
+      ```
+      </CodeGroup>
+    </Step>
+
+    <Step title="Start the development server">
+      Run the Next.js development server:
+
+      ```bash
+      npm run dev
+      ```
+
+      Open [http://localhost:3000](http://localhost:3000) in your browser to play the game.
+    </Step>
+  </Steps>
+</div>
+
+<div className="mt-16 mb-16 max-w-5xl mx-auto px-6">
+  <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-4">
+    Key Features
+  </h2>
+  <p className="text-base text-gray-600 dark:text-gray-400 mb-8">
+    Everything you need for an authentic Super Hexagon experience
+  </p>
+
+  <CardGroup cols={2}>
+    <Card title="Collision Detection" icon="gamepad" href="/mechanics/collision-detection">
+      Advanced ray-casting collision detection for precise gameplay
+    </Card>
+    <Card title="State Management" icon="database" href="/architecture/state-management">
+      Redux Toolkit for predictable game state and time-travel debugging
+    </Card>
+    <Card title="Smooth Animations" icon="wand-magic-sparkles" href="/components/superhexagon">
+      Framer Motion powers fluid rotations and obstacle movements
+    </Card>
+    <Card title="Mobile Support" icon="mobile" href="/mechanics/controls">
+      Touch controls for mobile devices with on-screen buttons
+    </Card>
+    <Card title="Audio System" icon="volume-high" href="/components/audio">
+      Background music and game-over sound effects
+    </Card>
+    <Card title="Atomic Design" icon="atom" href="/architecture/components">
+      Component architecture with atoms, molecules, and organisms
+    </Card>
+  </CardGroup>
+</div>
+
+<div className="mt-16 mb-16 max-w-5xl mx-auto px-6">
+  <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-4">
+    Explore the Documentation
+  </h2>
+  <p className="text-base text-gray-600 dark:text-gray-400 mb-8">
+    Deep dive into game mechanics, architecture, and component APIs
+  </p>
+
+  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+    <a
+      href="/mechanics/controls"
+      className="group block rounded-2xl border border-gray-200 dark:border-[#27272a] bg-white dark:bg-[#1a1d27] hover:border-[#f5914a] dark:hover:border-[#f5914a] overflow-hidden transition-colors no-underline"
+    >
+      <div className="p-6">
+        <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100 mb-2">
+          Game Mechanics
+        </h3>
+        <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+          Learn how controls, collision detection, and scoring work
+        </p>
+        <div className="flex items-center text-sm font-medium text-gray-900 dark:text-gray-400 group-hover:text-[#f5914a]">
+          Explore mechanics
+          <svg className="ml-2 w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+          </svg>
+        </div>
+      </div>
+    </a>
+
+    <a
+      href="/architecture/overview"
+      className="group block rounded-2xl border border-gray-200 dark:border-[#27272a] bg-white dark:bg-[#1a1d27] hover:border-[#f5914a] dark:hover:border-[#f5914a] overflow-hidden transition-colors no-underline"
+    >
+      <div className="p-6">
+        <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100 mb-2">
+          Architecture
+        </h3>
+        <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+          Understand the technical design and component structure
+        </p>
+        <div className="flex items-center text-sm font-medium text-gray-900 dark:text-gray-400 group-hover:text-[#f5914a]">
+          View architecture
+          <svg className="ml-2 w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+          </svg>
+        </div>
+      </div>
+    </a>
+
+    <a
+      href="/components/game"
+      className="group block rounded-2xl border border-gray-200 dark:border-[#27272a] bg-white dark:bg-[#1a1d27] hover:border-[#f5914a] dark:hover:border-[#f5914a] overflow-hidden transition-colors no-underline"
+    >
+      <div className="p-6">
+        <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100 mb-2">
+          Component Reference
+        </h3>
+        <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+          Browse the complete component API and implementation details
+        </p>
+        <div className="flex items-center text-sm font-medium text-gray-900 dark:text-gray-400 group-hover:text-[#f5914a]">
+          Browse components
+          <svg className="ml-2 w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+          </svg>
+        </div>
+      </div>
+    </a>
+
+    <a
+      href="/development/setup"
+      className="group block rounded-2xl border border-gray-200 dark:border-[#27272a] bg-white dark:bg-[#1a1d27] hover:border-[#f5914a] dark:hover:border-[#f5914a] overflow-hidden transition-colors no-underline"
+    >
+      <div className="p-6">
+        <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100 mb-2">
+          Development Guide
+        </h3>
+        <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+          Set up your environment, customize features, and deploy
+        </p>
+        <div className="flex items-center text-sm font-medium text-gray-900 dark:text-gray-400 group-hover:text-[#f5914a]">
+          Start developing
+          <svg className="ml-2 w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+          </svg>
+        </div>
+      </div>
+    </a>
+  </div>
+</div>
+
+<div className="mt-20 mb-16 max-w-5xl mx-auto px-6">
+  <div className="rounded-2xl border border-gray-200 dark:border-[#27272a] bg-gradient-to-br from-[#f5914a]/10 to-[#ff6b35]/10 dark:from-[#f5914a]/20 dark:to-[#ff6b35]/20 p-8 sm:p-12">
+    <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-4">
+      Ready to play?
+    </h2>
+    <p className="text-base text-gray-600 dark:text-gray-400 mb-6 max-w-2xl">
+      Clone the repository and start the development server to experience the game. Check out the quickstart guide for step-by-step instructions.
+    </p>
+    <a
+      href="/quickstart"
+      className="inline-flex items-center px-6 py-3 text-base font-semibold text-white bg-[#f5914a] rounded-lg hover:bg-[#ff6b35] transition-colors"
+    >
+      Get Started
+    </a>
+  </div>
+</div>

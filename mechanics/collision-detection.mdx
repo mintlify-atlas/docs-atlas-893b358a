@@ -1,0 +1,224 @@
+---
+title: 'Collision Detection'
+description: 'Understand the mathematical approach to collision detection in Super Hexagon'
+icon: 'vector-square'
+---
+
+## Overview
+
+Super Hexagon uses a **point-in-polygon algorithm** based on angle summation to detect when the player collides with incoming obstacles. The system checks three hitbox points on the player triangle against each obstacle's quadrilateral shape.
+
+## Core Algorithm
+
+### The Angle Summation Method
+
+The collision detection algorithm works by calculating the sum of angles formed between a point and all vertices of a polygon. If the point is inside the polygon, the angles sum to 360 degrees.
+
+```typescript collisionControllers.ts:3-39
+export const handleCollision = (
+  polyX1: number,
+  polyY1: number,
+  polyX2: number,
+  polyY2: number,
+  polyX3: number,
+  polyY3: number,
+  polyX4: number,
+  polyY4: number,
+  hitboX: number,
+  hitboY: number
+) => {
+  const angle1 = getAngle(
+    { x: polyX1, y: polyY1 },
+    { x: hitboX, y: hitboY },
+    { x: polyX2, y: polyY2 }
+  )
+  const angle2 = getAngle(
+    { x: polyX2, y: polyY2 },
+    { x: hitboX, y: hitboY },
+    { x: polyX3, y: polyY3 }
+  )
+  const angle3 = getAngle(
+    { x: polyX3, y: polyY3 },
+    { x: hitboX, y: hitboY },
+    { x: polyX4, y: polyY4 }
+  )
+  const angle4 = getAngle(
+    { x: polyX4, y: polyY4 },
+    { x: hitboX, y: hitboY },
+    { x: polyX1, y: polyY1 }
+  )
+
+  const totalAngle = angle1 + angle2 + angle3 + angle4
+
+  return totalAngle
+}
+```
+
+<Info>
+The function takes 8 parameters representing the four vertices of the obstacle polygon (X1,Y1 through X4,Y4) and 2 parameters for the hitbox point coordinates.
+</Info>
+
+## Angle Calculation
+
+### The Law of Cosines
+
+The `getAngle` function calculates the angle at point B formed by points A, B, and C using the law of cosines:
+
+```typescript collisionControllers.ts:41-49
+export const getAngle = (A: Position, B: Position, C: Position) => {
+  var AB = Math.sqrt(Math.pow(B.x - A.x, 2) + Math.pow(B.y - A.y, 2))
+  var BC = Math.sqrt(Math.pow(B.x - C.x, 2) + Math.pow(B.y - C.y, 2))
+  var AC = Math.sqrt(Math.pow(C.x - A.x, 2) + Math.pow(C.y - A.y, 2))
+
+  return (
+    Math.acos((BC * BC + AB * AB - AC * AC) / (2 * BC * AB)) * (180 / Math.PI)
+  )
+}
+```
+
+### Mathematical Breakdown
+
+<Steps>
+  <Step title="Calculate side lengths">
+    Compute the distances between points A-B, B-C, and A-C using the Pythagorean theorem.
+  </Step>
+  <Step title="Apply law of cosines">
+    Use the formula: cos(θ) = (BC² + AB² - AC²) / (2 × BC × AB)
+  </Step>
+  <Step title="Convert to degrees">
+    Apply Math.acos() to get radians, then multiply by (180/π) to convert to degrees.
+  </Step>
+</Steps>
+
+<Note>
+The Position type is defined in the Redux game slice as `{ x: number, y: number }`
+</Note>
+
+## Collision Detection in Action
+
+### Three-Point Hitbox System
+
+Each Line component checks collision against all three player hitboxes:
+
+```typescript Line.tsx:71-110
+const angle1 = handleCollision(
+  polyX1,
+  polyY1,
+  polyX2,
+  polyY2,
+  polyX3,
+  polyY3,
+  polyX4,
+  polyY4,
+  hitbox1?.x ?? 0,
+  hitbox1?.y ?? 0
+)
+
+const angle2 = handleCollision(
+  polyX1,
+  polyY1,
+  polyX2,
+  polyY2,
+  polyX3,
+  polyY3,
+  polyX4,
+  polyY4,
+  hitbox2?.x ?? 0,
+  hitbox2?.y ?? 0
+)
+
+const angle3 = handleCollision(
+  polyX1,
+  polyY1,
+  polyX2,
+  polyY2,
+  polyX3,
+  polyY3,
+  polyX4,
+  polyY4,
+  hitbox3?.x ?? 0,
+  hitbox3?.y ?? 0
+)
+
+setIsTouching(angle1 >= 360 || angle2 >= 360 || angle3 >= 360)
+```
+
+<Info>
+A collision is detected when **any** of the three hitbox points returns an angle sum ≥ 360 degrees.
+</Info>
+
+### Retrieving Obstacle Vertices
+
+The obstacle's four vertices are obtained from ref elements positioned at the corners:
+
+```typescript Line.tsx:62-69
+const polyX1 = refVertix1.current.getBoundingClientRect()?.x
+const polyY1 = refVertix1.current.getBoundingClientRect()?.y
+const polyX2 = refVertix2.current.getBoundingClientRect()?.x
+const polyY2 = refVertix2.current.getBoundingClientRect()?.y
+const polyX3 = refVertix3.current.getBoundingClientRect()?.x
+const polyY3 = refVertix3.current.getBoundingClientRect()?.y
+const polyX4 = refVertix4.current.getBoundingClientRect()?.x
+const polyY4 = refVertix4.current.getBoundingClientRect()?.y
+```
+
+## Collision Response
+
+When a collision is detected, the game triggers game over logic:
+
+```typescript Line.tsx:122-128
+useEffect(() => {
+  if (isTouching) {
+    dispatch(pause())
+    dispatch(updateBestScore())
+    isVolumeEnabled && audio.play()
+  }
+}, [audio, dispatch, isTouching, isVolumeEnabled])
+```
+
+<Tabs>
+  <Tab title="Game Pause">
+    The `pause()` action sets `isPLaying` to false, stopping the game loop.
+  </Tab>
+  <Tab title="Best Score Update">
+    The `updateBestScore()` action saves the current score if it exceeds the previous best.
+  </Tab>
+  <Tab title="Audio Feedback">
+    A collision sound effect plays if volume is enabled.
+  </Tab>
+</Tabs>
+
+## Performance Considerations
+
+### Reactive Updates
+
+Collision detection runs on every change to player position or board rotation:
+
+```typescript Line.tsx:112-120
+useEffect(() => {
+  // ... collision detection code
+}, [
+  hitbox1?.x,
+  hitbox1?.y,
+  hitbox2?.x,
+  hitbox2?.y,
+  hitbox3?.x,
+  hitbox3?.y,
+  boardAngle,
+])
+```
+
+<Warning>
+The collision check runs frequently during gameplay. The algorithm is optimized to use simple mathematical operations (multiplication, addition, square root, and arccosine) that execute quickly.
+</Warning>
+
+## Why This Approach?
+
+The angle summation method offers several advantages:
+
+- **Mathematically robust**: Works reliably for convex polygons
+- **No ray casting needed**: Simpler than intersection-based methods
+- **Precise detection**: Handles edge cases and corner collisions
+- **Framework agnostic**: Pure mathematical approach with no dependencies
+
+The 360-degree threshold provides a clear binary decision for collision detection, making the gameplay feel responsive and fair.

@@ -1,0 +1,578 @@
+---
+title: Deployment Guide
+description: Build and deploy Super Hexagon to production environments
+---
+
+## Overview
+
+Super Hexagon is a Next.js application that can be deployed to various hosting platforms. This guide covers building for production, deployment options, and optimization strategies.
+
+## Production Build
+
+### Building the Application
+
+Create an optimized production build:
+
+```bash
+npm run build
+```
+
+This command:
+1. Runs TypeScript compilation
+2. Optimizes React components
+3. Minifies JavaScript and CSS
+4. Generates static assets
+5. Creates a `.next` directory with production files
+
+The build output shows:
+- Page sizes and loading times
+- Static vs. server-rendered pages
+- Bundle size analysis
+
+### Testing Production Build Locally
+
+Test the production build before deployment:
+
+```bash
+npm run build
+npm start
+```
+
+The production server runs on `http://localhost:3000` by default.
+
+<Tip>
+Always test the production build locally to catch any build-time errors or optimization issues.
+</Tip>
+
+## Deployment Platforms
+
+### Vercel (Recommended)
+
+Vercel is the recommended platform for Next.js applications, offering zero-configuration deployment.
+
+<Steps>
+  <Step title="Install Vercel CLI">
+    ```bash
+    npm install -g vercel
+    ```
+  </Step>
+
+  <Step title="Deploy to Vercel">
+    Run the deployment command from your project directory:
+    
+    ```bash
+    vercel
+    ```
+    
+    Follow the prompts to:
+    - Link to an existing project or create new
+    - Configure project settings
+    - Deploy to production
+  </Step>
+
+  <Step title="Set environment variables">
+    Configure environment variables in the Vercel dashboard:
+    
+    - Navigate to Project Settings → Environment Variables
+    - Add `NEXT_PUBLIC_HOST` with your production URL
+    - Redeploy if needed
+  </Step>
+</Steps>
+
+**Vercel Advantages:**
+- Automatic HTTPS
+- Global CDN
+- Zero-config deployment
+- Preview deployments for branches
+- Automatic builds on git push
+
+**Deploy from GitHub:**
+
+1. Push your code to GitHub
+2. Import project in [Vercel dashboard](https://vercel.com)
+3. Vercel automatically detects Next.js settings
+4. Every push triggers a new deployment
+
+### Netlify
+
+Netlify is another excellent option for Next.js deployment.
+
+<Steps>
+  <Step title="Install Netlify CLI">
+    ```bash
+    npm install -g netlify-cli
+    ```
+  </Step>
+
+  <Step title="Build configuration">
+    Create a `netlify.toml` file in the project root:
+    
+    ```toml
+    [build]
+      command = "npm run build"
+      publish = ".next"
+
+    [[plugins]]
+      package = "@netlify/plugin-nextjs"
+    ```
+  </Step>
+
+  <Step title="Deploy">
+    ```bash
+    netlify deploy --prod
+    ```
+  </Step>
+</Steps>
+
+**Netlify Features:**
+- Form handling
+- Split testing
+- Deploy previews
+- Edge functions
+- Built-in analytics
+
+### Docker Deployment
+
+Deploy using Docker for containerized environments:
+
+<Steps>
+  <Step title="Create Dockerfile">
+    Create a `Dockerfile` in the project root:
+    
+    ```dockerfile
+    FROM node:18-alpine AS base
+
+    # Install dependencies
+    FROM base AS deps
+    WORKDIR /app
+    COPY package*.json ./
+    RUN npm ci
+
+    # Build application
+    FROM base AS builder
+    WORKDIR /app
+    COPY --from=deps /app/node_modules ./node_modules
+    COPY . .
+    RUN npm run build
+
+    # Production image
+    FROM base AS runner
+    WORKDIR /app
+    ENV NODE_ENV production
+
+    RUN addgroup --system --gid 1001 nodejs
+    RUN adduser --system --uid 1001 nextjs
+
+    COPY --from=builder /app/public ./public
+    COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
+    COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+
+    USER nextjs
+    EXPOSE 3000
+    ENV PORT 3000
+
+    CMD ["node", "server.js"]
+    ```
+  </Step>
+
+  <Step title="Update next.config.js">
+    Enable standalone output:
+    
+    ```javascript
+    /** @type {import('next').NextConfig} */
+    const nextConfig = {
+      output: 'standalone',
+    }
+
+    module.exports = nextConfig
+    ```
+  </Step>
+
+  <Step title="Build and run container">
+    ```bash
+    docker build -t superhexagon .
+    docker run -p 3000:3000 superhexagon
+    ```
+  </Step>
+</Steps>
+
+### Static Export
+
+<Warning>
+Super Hexagon uses client-side state management and should work with static export, but some features like API routes won't be available.
+</Warning>
+
+To export as static HTML:
+
+1. Update `next.config.js`:
+```javascript
+const nextConfig = {
+  output: 'export',
+  images: {
+    unoptimized: true,
+  },
+}
+```
+
+2. Build static files:
+```bash
+npm run build
+```
+
+3. Deploy the `out` directory to any static host:
+   - GitHub Pages
+   - AWS S3
+   - Cloudflare Pages
+   - Firebase Hosting
+
+## Environment Variables
+
+### Required Variables
+
+The game requires the following environment variable:
+
+| Variable | Description | Example |
+|----------|-------------|----------|
+| `NEXT_PUBLIC_HOST` | Base URL for audio assets | `https://superhexagon.com` |
+
+### Setting Variables by Platform
+
+**Vercel:**
+```bash
+vercel env add NEXT_PUBLIC_HOST production
+```
+
+**Netlify:**
+```bash
+netlify env:set NEXT_PUBLIC_HOST "https://superhexagon.com"
+```
+
+**Docker:**
+```bash
+docker run -p 3000:3000 -e NEXT_PUBLIC_HOST="https://superhexagon.com" superhexagon
+```
+
+**Local .env.local:**
+```bash
+NEXT_PUBLIC_HOST=http://localhost:3000
+```
+
+<Warning>
+Never commit `.env.local` files to version control. Add them to `.gitignore`.
+</Warning>
+
+## Performance Optimization
+
+### Bundle Size Analysis
+
+Analyze your bundle size to identify optimization opportunities:
+
+1. Install the bundle analyzer:
+```bash
+npm install @next/bundle-analyzer
+```
+
+2. Update `next.config.js`:
+```javascript
+const withBundleAnalyzer = require('@next/bundle-analyzer')({
+  enabled: process.env.ANALYZE === 'true',
+})
+
+module.exports = withBundleAnalyzer({
+  // your config
+})
+```
+
+3. Run analysis:
+```bash
+ANALYZE=true npm run build
+```
+
+### Code Splitting
+
+Next.js automatically code-splits by route. For additional optimization, use dynamic imports:
+
+```tsx
+import dynamic from 'next/dynamic'
+
+// Lazy load Menu component
+const Menu = dynamic(() => import('~components/organisms/Menu'), {
+  loading: () => <div>Loading...</div>,
+})
+```
+
+### Image Optimization
+
+If you add images to the game, use Next.js Image component:
+
+```tsx
+import Image from 'next/image'
+
+<Image 
+  src="/background.png" 
+  alt="Background" 
+  width={1920} 
+  height={1080}
+  priority
+/>
+```
+
+### Audio Asset Optimization
+
+Optimize audio files:
+
+1. **Compress audio files** using tools like FFmpeg:
+```bash
+ffmpeg -i game-over.wav -codec:a libmp3lame -qscale:a 2 game-over.mp3
+```
+
+2. **Use appropriate formats:**
+   - WebM for modern browsers
+   - MP3 for fallback
+   - Keep file sizes under 100KB
+
+3. **Lazy load audio:**
+```tsx
+const audio = useMemo(
+  () => new Audio(`${process.env.NEXT_PUBLIC_HOST}/game-over.wav`),
+  []
+)
+```
+
+### Framer Motion Optimization
+
+The game uses Framer Motion extensively. Optimize animations:
+
+```tsx
+// Use transform properties (GPU-accelerated)
+<motion.div
+  animate={{ 
+    rotate: 360,           // Good: GPU-accelerated
+    x: 100,                // Good: GPU-accelerated
+    scale: 1.5,            // Good: GPU-accelerated
+  }}
+  transition={{ 
+    ease: 'linear',        // Simpler easing = better performance
+  }}
+/>
+
+// Avoid layout properties
+<motion.div
+  animate={{ 
+    width: 100,            // Avoid: Triggers layout recalculation
+    height: 100,           // Avoid: Triggers layout recalculation
+  }}
+/>
+```
+
+### Redux Performance
+
+The game uses Redux Toolkit. Follow these optimization practices:
+
+1. **Use selectors efficiently:**
+```typescript
+// Memoized selector
+import { createSelector } from '@reduxjs/toolkit'
+
+const selectGame = (state: RootState) => state.game
+export const selectScore = createSelector(
+  selectGame,
+  (game) => game.score
+)
+```
+
+2. **Avoid unnecessary re-renders:**
+```tsx
+// Use specific selectors
+const score = useSelector(selectScore)  // Good: Only re-renders on score change
+
+// Instead of
+const { score } = useSelector(state => state.game)  // Re-renders on any game state change
+```
+
+## Monitoring & Analytics
+
+### Vercel Analytics
+
+Enable Vercel Analytics for performance insights:
+
+1. Install the package:
+```bash
+npm install @vercel/analytics
+```
+
+2. Add to `layout.tsx`:
+```tsx
+import { Analytics } from '@vercel/analytics/react'
+
+export default function RootLayout({ children }) {
+  return (
+    <html lang='en'>
+      <body>
+        <StoreProvider>{children}</StoreProvider>
+        <Analytics />
+      </body>
+    </html>
+  )
+}
+```
+
+### Error Tracking
+
+Integrate error tracking with Sentry:
+
+1. Install Sentry:
+```bash
+npm install @sentry/nextjs
+```
+
+2. Initialize Sentry:
+```bash
+npx @sentry/wizard -i nextjs
+```
+
+3. Errors are automatically tracked in production
+
+## Security Best Practices
+
+### Content Security Policy
+
+Add CSP headers in `next.config.js`:
+
+```javascript
+const nextConfig = {
+  async headers() {
+    return [
+      {
+        source: '/:path*',
+        headers: [
+          {
+            key: 'X-Frame-Options',
+            value: 'DENY',
+          },
+          {
+            key: 'X-Content-Type-Options',
+            value: 'nosniff',
+          },
+        ],
+      },
+    ]
+  },
+}
+```
+
+### Dependency Security
+
+Regularly audit dependencies:
+
+```bash
+npm audit
+npm audit fix
+```
+
+Keep dependencies updated:
+
+```bash
+npm outdated
+npm update
+```
+
+## Continuous Deployment
+
+### GitHub Actions
+
+Automate deployment with GitHub Actions:
+
+```yaml .github/workflows/deploy.yml
+name: Deploy to Vercel
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+          
+      - name: Install dependencies
+        run: npm ci
+        
+      - name: Run tests
+        run: npm test
+        
+      - name: Build
+        run: npm run build
+        
+      - name: Deploy to Vercel
+        uses: amondnet/vercel-action@v20
+        with:
+          vercel-token: ${{ secrets.VERCEL_TOKEN }}
+          vercel-org-id: ${{ secrets.ORG_ID }}
+          vercel-project-id: ${{ secrets.PROJECT_ID }}
+```
+
+## Troubleshooting
+
+### Build Failures
+
+**TypeScript errors:**
+```bash
+npx tsc --noEmit
+```
+
+**Memory issues during build:**
+```bash
+NODE_OPTIONS="--max-old-space-size=4096" npm run build
+```
+
+### Runtime Errors
+
+**Audio not loading:**
+- Verify `NEXT_PUBLIC_HOST` is set correctly
+- Check audio file paths and permissions
+- Ensure CORS is configured if serving from different domain
+
+**Redux hydration errors:**
+- Clear browser cache and localStorage
+- Check for state serialization issues
+- Verify StoreProvider wraps the application
+
+### Performance Issues
+
+**High memory usage:**
+- Check for memory leaks in intervals/timeouts
+- Ensure proper cleanup in useEffect hooks
+- Monitor with Chrome DevTools Performance tab
+
+**Slow animations:**
+- Reduce number of simultaneous animations
+- Use CSS transforms instead of layout properties
+- Consider reducing spawn rates
+
+## Post-Deployment Checklist
+
+- [ ] Test game functionality on production URL
+- [ ] Verify audio playback works
+- [ ] Test mobile controls on real devices
+- [ ] Check responsive design at various screen sizes
+- [ ] Test game performance (smooth 60 FPS)
+- [ ] Verify analytics tracking (if enabled)
+- [ ] Test error handling and reporting
+- [ ] Check HTTPS and security headers
+- [ ] Validate SEO meta tags
+- [ ] Monitor initial load times
+
+## Next Steps
+
+- Monitor application performance with analytics
+- Set up error tracking and alerting
+- Plan feature updates and improvements
+- Gather user feedback for iterations
+- Consider adding a backend for leaderboard functionality

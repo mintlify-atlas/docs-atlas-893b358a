@@ -1,0 +1,695 @@
+---
+title: 'Component Architecture'
+description: 'Atomic design pattern implementation with atoms, molecules, and organisms'
+---
+
+## Atomic Design Pattern
+
+Super Hexagon follows atomic design principles, organizing components into three hierarchical levels based on complexity and reusability:
+
+- **Atoms**: Basic building blocks that can't be broken down further
+- **Molecules**: Groups of atoms functioning together as a unit
+- **Organisms**: Complex components combining molecules and atoms into distinct sections
+
+This structure is reflected in the file system:
+
+```
+src/components/
+├── atoms/
+│   ├── Audio/
+│   │   ├── Audio.tsx
+│   │   ├── AudioController.tsx
+│   │   └── index.ts
+│   └── Score/
+│       ├── Score.tsx
+│       └── index.ts
+├── molecules/
+│   ├── Line/
+│   │   ├── Line.tsx
+│   │   └── index.ts
+│   └── Player/
+│       ├── Player.tsx
+│       └── index.ts
+└── organisms/
+    ├── Game/
+    │   ├── Game.tsx
+    │   └── index.ts
+    ├── Menu/
+    │   ├── Menu.tsx
+    │   └── index.ts
+    └── Superhexagon/
+        ├── SuperHexagon.tsx
+        └── index.ts
+```
+
+<Note>
+  Each component uses a barrel export pattern with an `index.ts` file for clean imports.
+</Note>
+
+## Atoms
+
+Atoms are the most basic UI components. They serve single, focused purposes.
+
+### Score Atom
+
+Displays the current game score in a fixed overlay:
+
+```tsx title="src/components/atoms/Score/Score.tsx"
+import { useSelector } from 'react-redux'
+import { selectScore } from '~redux/selectors/score'
+
+export const Score = () => {
+  const score = useSelector(selectScore)
+  return (
+    <div className='fixed w-14 h-14 top-3 right-3 text-3xl text-center p-2 shadow-lg bg-black border-2 border-white rounded-md text-white'>
+      {score}
+    </div>
+  )
+}
+```
+
+**Characteristics:**
+- No internal business logic
+- Consumes Redux state via `selectScore` selector
+- Pure presentation with Tailwind styling
+- Fixed positioning for consistent placement
+
+### Audio Atom
+
+Manages game background music playback:
+
+```tsx title="src/components/atoms/Audio/Audio.tsx"
+import { useEffect, useRef } from 'react'
+import { useSelector } from 'react-redux'
+import { selectIsVolumeEnabled, selectVolume } from '~redux/selectors/volume'
+
+export const Audio = () => {
+  const ref = useRef<HTMLAudioElement>(null)
+  const volume = useSelector(selectVolume)
+  const isVolumeEnabled = useSelector(selectIsVolumeEnabled)
+
+  useEffect(() => {
+    if (ref.current) ref.current.volume = volume
+  }, [volume])
+
+  if (!isVolumeEnabled) return null
+
+  return (
+    <audio ref={ref} autoPlay>
+      <source
+        src={`${process.env.NEXT_PUBLIC_HOST}/audio.mp3`}
+        type='audio/mpeg'
+      />
+    </audio>
+  )
+}
+```
+
+**Characteristics:**
+- Manages audio element ref for volume control
+- Conditionally renders based on volume settings
+- Auto-plays when rendered
+- Responds to Redux volume changes
+
+### AudioController Atom
+
+Provides volume control UI (used in Menu organism):
+
+```tsx
+// Located at src/components/atoms/Audio/AudioController.tsx
+// Renders volume toggle button with icons
+```
+
+## Molecules
+
+Molecules combine atoms and add interaction logic.
+
+### Player Molecule
+
+Manages player input, position, and hitbox detection:
+
+```tsx title="src/components/molecules/Player/Player.tsx" {10-16,18-20,40-50}
+import { useEffect, useRef, useState } from 'react'
+import { useDispatch } from 'react-redux'
+import {
+  keyDownHandler,
+  keyUpHandler,
+  playerController,
+} from '~helpers/playerControllers'
+import { updatePosition } from '~redux/slices/game'
+
+export const Player = () => {
+  const ref = useRef<HTMLDivElement>(null)
+  const dispatch = useDispatch()
+
+  const refHitbox1 = useRef<HTMLDivElement>(null)
+  const refHitbox2 = useRef<HTMLDivElement>(null)
+  const refHitbox3 = useRef<HTMLDivElement>(null)
+
+  const [leftHeld, setLeftHeld] = useState(false)
+  const [rightHeld, setRightHeld] = useState(false)
+  const [degres, setDegres] = useState(0)
+  const [isMobile, setIsMobile] = useState(false)
+
+  // Keyboard event listeners
+  useEffect(() => {
+    window.addEventListener('keydown', (e) =>
+      keyDownHandler({ key: e.key, setLeftHeld, setRightHeld })
+    )
+    window.addEventListener('keyup', (e) =>
+      keyUpHandler({ key: e.key, setLeftHeld, setRightHeld })
+    )
+    return () => {
+      window.removeEventListener('keydown', (e) =>
+        keyDownHandler({ key: e.key, setLeftHeld, setRightHeld })
+      )
+      window.removeEventListener('keyup', (e) =>
+        keyUpHandler({ key: e.key, setLeftHeld, setRightHeld })
+      )
+    }
+  }, [])
+
+  // Update player rotation based on input
+  useEffect(() => {
+    setTimeout(() => {
+      playerController({
+        leftHeld,
+        rightHeld,
+        degres,
+        setDegres,
+        el: ref.current,
+      })
+    }, 10)
+  }, [degres, leftHeld, rightHeld])
+
+  // Update Redux with hitbox positions
+  useEffect(() => {
+    const hitbox1 = {
+      x: refHitbox1.current?.getBoundingClientRect().x ?? 0,
+      y: refHitbox1.current?.getBoundingClientRect().y ?? 0,
+    }
+    const hitbox2 = {
+      x: refHitbox2.current?.getBoundingClientRect().x ?? 0,
+      y: refHitbox2.current?.getBoundingClientRect().y ?? 0,
+    }
+    const hitbox3 = {
+      x: refHitbox3.current?.getBoundingClientRect().x ?? 0,
+      y: refHitbox3.current?.getBoundingClientRect().y ?? 0,
+    }
+
+    dispatch(updatePosition({ hitbox1, hitbox2, hitbox3 }))
+  }, [degres, dispatch])
+
+  return (
+    <>
+      <div ref={ref} className='player'>
+        <div className='relative cursor bg-[red]'>
+          <div ref={refHitbox1} className='absolute left-0 right-0 ml-auto mr-auto z-[99] w-[1px] min-h-[1px]' />
+          <div ref={refHitbox2} className='absolute left-0 bottom-0 ml-auto mr-auto z-[99] w-[1px] min-h-[1px]' />
+          <div ref={refHitbox3} className='absolute right-0 bottom-0 ml-auto mr-auto z-[99] w-[1px] min-h-[1px]' />
+        </div>
+      </div>
+      {isMobile && (
+        <>
+          <button
+            onTouchStart={() => keyDownHandler({ key: 'ArrowLeft', setLeftHeld, setRightHeld })}
+            onTouchEnd={() => keyUpHandler({ key: 'ArrowLeft', setLeftHeld, setRightHeld })}
+            className='fixed bottom-6 left-6 w-16 h-16 p-3 rounded-full border-2 border-white bg-black shadow-lg'
+          />
+          <button
+            onTouchStart={() => keyDownHandler({ key: 'ArrowRight', setLeftHeld, setRightHeld })}
+            onTouchEnd={() => keyUpHandler({ key: 'ArrowRight', setLeftHeld, setRightHeld })}
+            className='fixed bottom-6 right-6 w-16 h-16 p-3 rounded-full border-2 border-white bg-black shadow-lg'
+          />
+        </>
+      )}
+    </>
+  )
+}
+```
+
+**Characteristics:**
+- Manages three hitbox refs for triangle collision detection
+- Handles keyboard and touch input
+- Updates Redux with player position every frame
+- Uses helper functions from `~helpers/playerControllers`
+- Responsive mobile controls
+
+### Line Molecule
+
+Represents moving obstacles with collision detection:
+
+```tsx title="src/components/molecules/Line/Line.tsx" {45-52,54-120,122-128}
+import { motion } from 'framer-motion'
+import { useEffect, useRef, useState } from 'react'
+import { useDispatch, useSelector } from 'react-redux'
+import { handleCollision } from '~helpers/collisionControllers'
+import { selectAngle } from '~redux/selectors/angle'
+import { selectPlayerH1, selectPlayerH2, selectPlayerH3 } from '~redux/selectors/player'
+import { pause, updateBestScore, updateScore } from '~redux/slices/game'
+
+type LineProps = {
+  audio: HTMLAudioElement
+}
+
+export const Line = ({ audio }: LineProps) => {
+  const dispatch = useDispatch()
+  const ref = useRef<HTMLDivElement>(null)
+
+  const refVertix1 = useRef<HTMLDivElement>(null)
+  const refVertix2 = useRef<HTMLDivElement>(null)
+  const refVertix3 = useRef<HTMLDivElement>(null)
+  const refVertix4 = useRef<HTMLDivElement>(null)
+
+  const hitbox1 = useSelector(selectPlayerH1)
+  const hitbox2 = useSelector(selectPlayerH2)
+  const hitbox3 = useSelector(selectPlayerH3)
+  const boardAngle = +useSelector(selectAngle)
+  const isPlaying = useSelector(selectIsPLaying)
+
+  const [isTouching, setIsTouching] = useState(false)
+  const [shouldRender, setShouldRender] = useState(true)
+
+  // Auto-remove after 12 seconds and increment score
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      ref.current && ref.current.parentElement?.remove()
+      setShouldRender(false)
+      dispatch(updateScore())
+    }, 12000)
+    setTimeoutId(timeoutId)
+  }, [dispatch])
+
+  // Collision detection logic
+  useEffect(() => {
+    if (
+      ref.current &&
+      refVertix1.current &&
+      refVertix2.current &&
+      refVertix3.current &&
+      refVertix4.current
+    ) {
+      const polyX1 = refVertix1.current.getBoundingClientRect()?.x
+      const polyY1 = refVertix1.current.getBoundingClientRect()?.y
+      const polyX2 = refVertix2.current.getBoundingClientRect()?.x
+      const polyY2 = refVertix2.current.getBoundingClientRect()?.y
+      const polyX3 = refVertix3.current.getBoundingClientRect()?.x
+      const polyY3 = refVertix3.current.getBoundingClientRect()?.y
+      const polyX4 = refVertix4.current.getBoundingClientRect()?.x
+      const polyY4 = refVertix4.current.getBoundingClientRect()?.y
+
+      const angle1 = handleCollision(
+        polyX1, polyY1, polyX2, polyY2,
+        polyX3, polyY3, polyX4, polyY4,
+        hitbox1?.x ?? 0, hitbox1?.y ?? 0
+      )
+
+      const angle2 = handleCollision(
+        polyX1, polyY1, polyX2, polyY2,
+        polyX3, polyY3, polyX4, polyY4,
+        hitbox2?.x ?? 0, hitbox2?.y ?? 0
+      )
+
+      const angle3 = handleCollision(
+        polyX1, polyY1, polyX2, polyY2,
+        polyX3, polyY3, polyX4, polyY4,
+        hitbox3?.x ?? 0, hitbox3?.y ?? 0
+      )
+
+      setIsTouching(angle1 >= 360 || angle2 >= 360 || angle3 >= 360)
+    }
+  }, [
+    hitbox1?.x, hitbox1?.y,
+    hitbox2?.x, hitbox2?.y,
+    hitbox3?.x, hitbox3?.y,
+    boardAngle,
+  ])
+
+  // Handle game over on collision
+  useEffect(() => {
+    if (isTouching) {
+      dispatch(pause())
+      dispatch(updateBestScore())
+      isVolumeEnabled && audio.play()
+    }
+  }, [audio, dispatch, isTouching, isVolumeEnabled])
+
+  if (!shouldRender || !isPlaying) return null
+
+  return (
+    <motion.div
+      ref={ref}
+      initial={{ y: 0 }}
+      animate={{ y: 255, scaleY: 0.2, scaleX: 0 }}
+      transition={{ duration: 12, ease: 'linear' }}
+      className='relative w-full h-3 bg-orange-500'
+    >
+      <div ref={refVertix1} className='absolute w-[1px] h-[1px] top-0 left-0' />
+      <div ref={refVertix2} className='absolute w-[1px] h-[1px] bottom-0 left-[2px]' />
+      <div ref={refVertix3} className='absolute w-[1px] h-[1px] top-0 right-0' />
+      <div ref={refVertix4} className='absolute w-[1px] h-[1px] bottom-0 right-[2px]' />
+    </motion.div>
+  )
+}
+```
+
+**Characteristics:**
+- Uses Framer Motion for smooth movement animation
+- Tracks four vertex positions for polygon collision detection
+- Subscribes to player hitbox positions from Redux
+- Uses `handleCollision` helper for ray-casting collision detection
+- Auto-increments score when passing the player
+- Triggers game over state on collision
+
+## Organisms
+
+Organisms are complex components that compose molecules and atoms into complete UI sections.
+
+### Game Organism
+
+Top-level game orchestrator that conditionally renders game or menu:
+
+```tsx title="src/components/organisms/Game/Game.tsx"
+import { SuperHexagon } from '~components/organisms/Superhexagon'
+import { Menu } from '~components/organisms/Menu'
+import { Score } from '~components/atoms/Score'
+import { Audio } from '~components/atoms/Audio'
+import { useSelector } from 'react-redux'
+import { selectIsPLaying } from '~redux/selectors/isPlaying'
+
+export const Game = () => {
+  const isPlaying = useSelector(selectIsPLaying)
+  return (
+    <>
+      {isPlaying && <SuperHexagon />}
+      {isPlaying && <Audio />}
+      {isPlaying && <Score />}
+      {!isPlaying && <Menu />}
+    </>
+  )
+}
+```
+
+**Characteristics:**
+- Single source of truth for game/menu state
+- Conditionally renders based on `isPlaying` from Redux
+- Composes three organisms: `SuperHexagon`, `Menu`, and atoms `Score` and `Audio`
+- No internal state or complex logic
+
+### SuperHexagon Organism
+
+The main game view with rotating hexagon and obstacle spawning:
+
+```tsx title="src/components/organisms/Superhexagon/SuperHexagon.tsx" {14-26,32-46,48-67,69-92}
+import { motion } from 'framer-motion'
+import { useCallback, useEffect, useMemo, useRef } from 'react'
+import { createRoot } from 'react-dom/client'
+import { useDispatch } from 'react-redux'
+import { Line } from '~components/molecules/Line'
+import { Player } from '~components/molecules/Player'
+import { StoreProvider } from '~redux/Provider/StoreProvider'
+import {
+  setPlayerIntervalId,
+  setSpawnIntervalId,
+  updateAngle,
+} from '~redux/slices/game'
+
+export const SuperHexagon = () => {
+  const ref = useRef<HTMLDivElement>(null)
+  const dispatch = useDispatch()
+
+  const t1 = useRef<HTMLDivElement>(null)
+  const t2 = useRef<HTMLDivElement>(null)
+  const t3 = useRef<HTMLDivElement>(null)
+  const t4 = useRef<HTMLDivElement>(null)
+  const t5 = useRef<HTMLDivElement>(null)
+  const t6 = useRef<HTMLDivElement>(null)
+
+  const triangles = useMemo(() => new Array(t1, t2, t3, t4, t5, t6), [])
+
+  const audio = useMemo(
+    () => new Audio(`${process.env.NEXT_PUBLIC_HOST}/game-over.wav`),
+    []
+  )
+
+  // Spawn obstacles in random triangles
+  const handleSpawn = useCallback(() => {
+    const randomId = Math.floor(Math.random() * 6)
+
+    triangles.map((triangle, idx) => {
+      if (idx === randomId) return
+      const div = document.createElement('div')
+      div.className = 'h-0'
+      createRoot(div).render(
+        <StoreProvider>
+          <Line audio={audio} />
+        </StoreProvider>
+      )
+      triangle.current?.appendChild(div)
+    })
+  }, [triangles, audio])
+
+  // Start spawn interval
+  useEffect(() => {
+    const spawnIntervalId = setInterval(handleSpawn, 1800)
+    dispatch(setSpawnIntervalId(spawnIntervalId))
+  }, [dispatch, handleSpawn])
+
+  // Track board rotation angle
+  useEffect(() => {
+    const playerIntervalId = setInterval(() => {
+      const transform = ref.current?.style?.transform
+      if (transform)
+        dispatch(
+          updateAngle({
+            angle: transform
+              ?.match(/rotate(\(.+deg\))/gm)?.[0]
+              .split('.')[0]
+              ?.match(/([0-9]+)/gm)?.[0],
+          })
+        )
+    }, 20)
+    dispatch(setPlayerIntervalId(playerIntervalId))
+  }, [dispatch])
+
+  return (
+    <>
+      <div className='overflow-hidden bg-[#f5914a]'>
+        <motion.div
+          ref={ref}
+          className='box relative'
+          initial={{ rotate: 0 }}
+          animate={{ rotate: 360 }}
+          transition={{ repeat: Infinity, duration: 30, ease: 'linear' }}
+        >
+          {triangles.map((triangle, idx) => (
+            <div
+              key={idx}
+              ref={triangle}
+              className='triangle top-[calc(50vh_-_260px)]'
+            />
+          ))}
+          <div className='hexagon absolute w-[92px] h-20 left-0 right-0 top-[calc(50vh_-_40px)] ml-auto mr-auto bg-orange-500' />
+          <div className='hexagon absolute w-[81px] h-[70px] left-0 right-0 top-[calc(50vh_-_35px)] ml-auto mr-auto  bg-[#de0000]' />
+        </motion.div>
+      </div>
+      <Player />
+    </>
+  )
+}
+```
+
+**Characteristics:**
+- Manages 6 triangle refs for obstacle spawning
+- Creates game loop with spawn interval (1800ms)
+- Tracks rotation angle with player interval (20ms)
+- Dynamically creates `Line` components using React 18's `createRoot`
+- Uses Framer Motion for infinite rotation animation
+- Composes `Player` molecule
+
+<Note>
+  The component uses `createRoot` to dynamically render `Line` molecules, wrapping each in a `StoreProvider` to maintain Redux context.
+</Note>
+
+### Menu Organism
+
+Game menu with score display, leaderboard, and play button:
+
+```tsx title="src/components/organisms/Menu/Menu.tsx" {7-15,16-100}
+import classnames from 'classnames'
+import { useDispatch, useSelector } from 'react-redux'
+import { AudioController } from '~components/atoms/Audio'
+import { selectBestScore, selectScore } from '~redux/selectors/score'
+import { play, resetGame } from '~redux/slices/game'
+
+export const Menu = () => {
+  const dispatch = useDispatch()
+  const score = useSelector(selectScore)
+  const bestScore = useSelector(selectBestScore)
+
+  const handlePLay = () => {
+    dispatch(resetGame())
+    dispatch(play())
+  }
+  
+  return (
+    <div className='w-full h-full flex divide-x-2 divide-[#ffc8e4] p-4'>
+      <div className={classnames(
+        'h-full flex flex-col p-4 md:p-20 justify-between items-center text-white',
+        { 'w-1/2': bestScore, 'w-full': !bestScore }
+      )}>
+        <AudioController />
+        {!bestScore && (
+          <h1 className='text-4xl mt-8 md:text-8xl md:mt-0 shadow-lg uppercase'>
+            SUPERHEXAGON
+          </h1>
+        )}
+        {!!bestScore && (
+          <>
+            <h2 className='text-3xl md:text-6xl shadow-lg uppercase'>Your score</h2>
+            <p className='text-5xl md:text-8xl shadow-lg'>{score}</p>
+          </>
+        )}
+        <button
+          type='button'
+          className={classnames(
+            'group w-64 p-2 md:p-3 border-2 rounded-md shadow-md font-semibold hover:shadow-[#ff99cc] uppercase',
+            {
+              'w-64': bestScore,
+              'w-1/2 md:w-1/3 absolute top-[60vh] md:top-[50vh]': !bestScore,
+            }
+          )}
+          onClick={handlePLay}
+        >
+          <p className='group-hover:drop-shadow-[2px_2px_2px_rgba(255,153,204,1)]'>
+            {!bestScore ? 'PLAY!' : 'PLAY AGAIN!'}
+          </p>
+        </button>
+      </div>
+      {bestScore && (
+        <div className='w-1/2 h-full flex flex-col justify-between items-center p-4 md:p-20 text-white text-center'>
+          <h2 className='text-3xl md:text-6xl uppercase'>Leaderboard</h2>
+          <div className='w-full h-full flex flex-col justify-evenly items-center py-2 md:py-8 px-8 md:px-24'>
+            {[...new Array(10)].map((_, idx) => (
+              <div key={idx} className='w-full flex justify-between text-lg md:text-2xl'>
+                <span>Player {idx}</span>
+                <span>{idx}{idx}{idx}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+```
+
+**Characteristics:**
+- Conditional layout: full-width initially, split on game over
+- Displays current score and best score from Redux
+- Shows leaderboard after first game
+- Includes `AudioController` atom
+- Dispatches `resetGame` and `play` actions on button click
+- Responsive design with Tailwind breakpoints
+
+## Component Composition Patterns
+
+### Container/Presentational Pattern
+
+While not strictly enforced, components generally follow this pattern:
+
+- **Container components** (organisms): Manage state, Redux connections, side effects
+- **Presentational components** (atoms/molecules): Receive props, render UI
+
+Example: `Game` (container) manages game state and renders `Score`, `Audio` (presentational).
+
+### Dynamic Component Creation
+
+The `SuperHexagon` organism dynamically creates `Line` components:
+
+```tsx
+const div = document.createElement('div')
+div.className = 'h-0'
+createRoot(div).render(
+  <StoreProvider>
+    <Line audio={audio} />
+  </StoreProvider>
+)
+triangle.current?.appendChild(div)
+```
+
+This pattern allows spawning an unbounded number of obstacles without pre-rendering them.
+
+### Ref-based Communication
+
+Components use refs for DOM measurements rather than state:
+
+```tsx
+const hitbox1 = {
+  x: refHitbox1.current?.getBoundingClientRect().x ?? 0,
+  y: refHitbox1.current?.getBoundingClientRect().y ?? 0,
+}
+```
+
+This avoids unnecessary re-renders while maintaining accurate collision detection.
+
+## Component Communication
+
+Components communicate through three mechanisms:
+
+<CardGroup cols={3}>
+  <Card title="Redux State" icon="database">
+    Global state for game status, score, player position
+  </Card>
+  <Card title="Props" icon="arrow-right">
+    Direct data passing (e.g., `audio` prop to `Line`)
+  </Card>
+  <Card title="DOM Refs" icon="crosshairs">
+    Direct DOM access for measurements and collision detection
+  </Card>
+</CardGroup>
+
+## Styling Approach
+
+All components use Tailwind CSS with:
+
+- **Utility classes**: `flex`, `w-full`, `bg-black`, etc.
+- **Custom colors**: Hex values for game theme (`#f5914a`, `#ffc8e4`)
+- **Responsive modifiers**: `md:text-8xl`, `md:p-20`
+- **Custom CSS**: Hexagon and triangle shapes in global CSS
+
+## Helper Functions
+
+Complex logic is extracted to helper modules:
+
+- `~helpers/playerControllers`: Keyboard input and player rotation
+- `~helpers/collisionControllers`: Ray-casting collision detection
+- `~helpers/rayCasting`: Geometric calculations
+
+This keeps components focused on rendering and composition.
+
+## Testing Considerations
+
+The atomic design structure facilitates testing:
+
+- **Atoms**: Unit test in isolation with mocked Redux
+- **Molecules**: Integration test with real Redux store
+- **Organisms**: E2E test full game flow
+
+## Performance Optimizations
+
+1. **Memoized selectors**: Prevent unnecessary re-renders
+2. **useCallback**: Stable function references for `handleSpawn`
+3. **useMemo**: Cached triangle array and audio instance
+4. **Conditional rendering**: Only render active components
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Architecture Overview" href="/architecture/overview" icon="diagram-project">
+    Understand the high-level system design
+  </Card>
+  <Card title="State Management" href="/architecture/state-management" icon="database">
+    Deep dive into Redux implementation
+  </Card>
+</CardGroup>

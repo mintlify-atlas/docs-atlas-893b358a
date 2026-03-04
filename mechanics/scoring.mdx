@@ -1,0 +1,227 @@
+---
+title: 'Scoring System'
+description: 'Learn how score tracking and best score persistence work in Super Hexagon'
+icon: 'trophy'
+---
+
+## Overview
+
+Super Hexagon implements a time-based scoring system where points accumulate as obstacles pass by the player. The score is managed through Redux state with automatic best score tracking and persistence.
+
+## Score State
+
+### Redux Slice Definition
+
+The scoring system is part of the game slice in Redux:
+
+```typescript game.ts:9-22
+export type PlayerState = {
+  isPLaying: boolean
+  player: {
+    hitbox1: Position | null
+    hitbox2: Position | null
+    hitbox3: Position | null
+  }
+  angle: string
+  score: number
+  bestScore?: number
+  spawnIntervalId?: NodeJS.Timer
+  playerIntervalId?: NodeJS.Timer
+  volume: number
+}
+```
+
+<Info>
+Both `score` and `bestScore` are stored as numbers in the Redux state. The `bestScore` is optional and only set after the first game over.
+</Info>
+
+### Initial State
+
+```typescript game.ts:24-30
+const initialState: PlayerState = {
+  isPLaying: false,
+  player: { hitbox1: null, hitbox2: null, hitbox3: null },
+  angle: '0',
+  score: 0,
+  volume: 0.4,
+}
+```
+
+## Score Updates
+
+### Incrementing Score
+
+The score increments by 1 each time an obstacle successfully passes the player:
+
+```typescript game.ts:67-69
+updateScore: (state) => {
+  state.score += 1
+},
+```
+
+### Trigger Mechanism
+
+Scores update when obstacles exit the play area. Each Line component has a 12-second lifespan:
+
+```typescript Line.tsx:45-52
+useEffect(() => {
+  const timeoutId = setTimeout(() => {
+    ref.current && ref.current.parentElement?.remove()
+    setShouldRender(false)
+    dispatch(updateScore())
+  }, 12000)
+  setTimeoutId(timeoutId)
+}, [dispatch])
+```
+
+<Note>
+The 12-second timeout corresponds to the animation duration defined in the Framer Motion transition (Line.tsx:146). When the obstacle completes its animation and exits the screen, `updateScore()` is dispatched.
+</Note>
+
+## Score Display
+
+### Score Selector
+
+The displayed score is transformed from the raw state value:
+
+```typescript score.ts:4-9
+const selectScoreState = (state: RootState) => state.game.score
+
+export const selectScore = createSelector(selectScoreState, (score) =>
+  Math.floor(score / 5)
+)
+```
+
+<Info>
+The **displayed score is divided by 5** and floored. This means:
+- Raw score 0-4 → Display: 0
+- Raw score 5-9 → Display: 1
+- Raw score 10-14 → Display: 2
+- And so on...
+</Info>
+
+This creates a smoother progression and makes scores feel more earned, as you need to avoid 5 obstacles to gain 1 point.
+
+### Best Score Selector
+
+```typescript score.ts:11-14
+export const selectBestScore = createSelector(
+  selectBestScoreState,
+  (bestScore) => bestScore
+)
+```
+
+<Warning>
+There appears to be a bug in the best score selector implementation. Line 5 reads `state.game.score` instead of `state.game.bestScore`. This means the best score selector currently returns the current score, not the best score.
+</Warning>
+
+## Best Score Tracking
+
+### Update Logic
+
+The best score updates when the game ends (on collision):
+
+```typescript game.ts:70-72
+updateBestScore: (state) => {
+  if (state.score > (state?.bestScore ?? 0)) state.bestScore = state.score
+},
+```
+
+The logic compares the current score against the previous best score (defaulting to 0 if undefined) and updates if the current score is higher.
+
+### Trigger on Collision
+
+When the player collides with an obstacle:
+
+```typescript Line.tsx:122-128
+useEffect(() => {
+  if (isTouching) {
+    dispatch(pause())
+    dispatch(updateBestScore())
+    isVolumeEnabled && audio.play()
+  }
+}, [audio, dispatch, isTouching, isVolumeEnabled])
+```
+
+<Steps>
+  <Step title="Collision detected">
+    The `isTouching` state becomes true when any player hitbox enters an obstacle polygon.
+  </Step>
+  <Step title="Game paused">
+    `dispatch(pause())` sets `isPLaying` to false.
+  </Step>
+  <Step title="Best score updated">
+    `dispatch(updateBestScore())` compares and potentially updates the best score.
+  </Step>
+  <Step title="Audio feedback">
+    The collision sound plays if volume is enabled.
+  </Step>
+</Steps>
+
+## Game Reset
+
+When starting a new game, the score resets but the best score persists:
+
+```typescript game.ts:73-77
+resetGame: (state) => {
+  state.player = { hitbox1: null, hitbox2: null, hitbox3: null }
+  state.angle = '0'
+  state.score = 0
+},
+```
+
+<Note>
+Notice that `resetGame` does **not** reset `bestScore`. This allows the best score to persist across multiple game sessions.
+</Note>
+
+## Score Actions
+
+All score-related actions are exported from the game slice:
+
+```typescript game.ts:81-92
+export const {
+  play,
+  pause,
+  switchVolume,
+  setSpawnIntervalId,
+  setPlayerIntervalId,
+  updatePosition,
+  updateAngle,
+  updateBestScore,
+  updateScore,
+  resetGame,
+} = gameSlice.actions
+```
+
+## Scoring Flow Diagram
+
+<Tabs>
+  <Tab title="Normal Gameplay">
+    1. Obstacle spawns
+    2. Obstacle animates toward center over 12 seconds
+    3. Obstacle timeout completes
+    4. `updateScore()` dispatched → `state.score += 1`
+    5. Display updates via selector (score / 5)
+  </Tab>
+  <Tab title="Game Over">
+    1. Collision detected
+    2. `pause()` dispatched → stops gameplay
+    3. `updateBestScore()` dispatched → compares and saves best
+    4. Menu displays final score and best score
+    5. Player can restart → `resetGame()` clears score but keeps best
+  </Tab>
+</Tabs>
+
+## Integration with Components
+
+The Score component uses these selectors to display real-time information:
+
+```typescript Game.tsx:14
+{isPlaying && <Score />}
+```
+
+The Score component (not shown in source) would use `useSelector(selectScore)` and `useSelector(selectBestScore)` to retrieve the current and best scores for display.
+
+<Info>
+The score only displays during active gameplay (`isPlaying === true`). The Menu component likely shows the final score and best score when the game ends.
+</Info>

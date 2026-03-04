@@ -1,0 +1,194 @@
+---
+title: 'Architecture Overview'
+description: 'High-level architecture and technology stack of Super Hexagon'
+---
+
+## Introduction
+
+Super Hexagon is built as a modern Next.js application using React 18, Redux Toolkit for state management, Framer Motion for animations, and Tailwind CSS for styling. The architecture follows atomic design principles with a clear separation of concerns between presentation and business logic.
+
+## Technology Stack
+
+The game leverages the following core technologies:
+
+<CardGroup cols={2}>
+  <Card title="Next.js 13.4" icon="react">
+    App Router architecture with server and client components
+  </Card>
+  <Card title="Redux Toolkit" icon="database">
+    Centralized state management with slices and selectors
+  </Card>
+  <Card title="Framer Motion" icon="wand-magic-sparkles">
+    Declarative animations for game elements and transitions
+  </Card>
+  <Card title="Tailwind CSS" icon="paintbrush">
+    Utility-first styling with custom hexagon geometries
+  </Card>
+</CardGroup>
+
+## Next.js App Structure
+
+The application uses Next.js 13's App Router located in `src/app/`:
+
+```tsx title="src/app/layout.tsx"
+import { StoreProvider } from '~redux/Provider/StoreProvider'
+
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  return (
+    <html lang='en'>
+      <body className={inter.className}>
+        <StoreProvider>{children}</StoreProvider>
+      </body>
+    </html>
+  )
+}
+```
+
+The root layout wraps the entire application with the Redux `StoreProvider`, making the game state accessible to all components.
+
+```tsx title="src/app/page.tsx"
+import { Game } from '~components/organisms/Game'
+
+export default function Home() {
+  return (
+    <main className='flex h-screen w-screen items-center justify-center overflow-hidden bg-black'>
+      <Game />
+    </main>
+  )
+}
+```
+
+The homepage renders a single `Game` organism that orchestrates the entire game experience.
+
+## Component Hierarchy
+
+The application follows atomic design with three distinct levels:
+
+```
+Page (src/app/page.tsx)
+└── Game (organism)
+    ├── SuperHexagon (organism) - when playing
+    │   ├── Player (molecule)
+    │   └── Line (molecule) × N
+    ├── Menu (organism) - when not playing
+    ├── Score (atom) - when playing
+    └── Audio (atom) - when playing
+```
+
+### Component Organization
+
+Components are organized by atomic design principles in `src/components/`:
+
+- **Atoms** (`atoms/`): Basic building blocks like `Score` and `Audio`
+- **Molecules** (`molecules/`): Composite components like `Player` and `Line`
+- **Organisms** (`organisms/`): Complex features like `Game`, `SuperHexagon`, and `Menu`
+
+<Note>
+  Each component is co-located with its TypeScript definition and barrel export in an `index.ts` file.
+</Note>
+
+## Data Flow
+
+The game uses unidirectional data flow powered by Redux:
+
+1. **User Input** → Keyboard/touch events trigger local state updates in `Player` component
+2. **State Updates** → Components dispatch Redux actions to update global game state
+3. **Selectors** → Components subscribe to specific slices of state via memoized selectors
+4. **Re-render** → Components re-render when their selected state changes
+
+```tsx title="Example: Game Component Data Flow"
+import { useSelector } from 'react-redux'
+import { selectIsPLaying } from '~redux/selectors/isPlaying'
+
+export const Game = () => {
+  const isPlaying = useSelector(selectIsPLaying)
+  return (
+    <>
+      {isPlaying && <SuperHexagon />}
+      {isPlaying && <Audio />}
+      {isPlaying && <Score />}
+      {!isPlaying && <Menu />}
+    </>
+  )
+}
+```
+
+The `Game` component conditionally renders child organisms based on the `isPlaying` state from Redux.
+
+## Game Loop Architecture
+
+Super Hexagon implements a real-time game loop using two key intervals:
+
+1. **Spawn Interval** (1800ms): Spawns new `Line` obstacles at regular intervals
+2. **Player Interval** (20ms): Updates player rotation angle for collision detection
+
+These intervals are managed in Redux state and controlled by the `SuperHexagon` component:
+
+```tsx title="src/components/organisms/Superhexagon/SuperHexagon.tsx:48"
+useEffect(() => {
+  const spawnIntervalId = setInterval(handleSpawn, 1800)
+  dispatch(setSpawnIntervalId(spawnIntervalId))
+}, [dispatch, handleSpawn])
+
+useEffect(() => {
+  const playerIntervalId = setInterval(() => {
+    const transform = ref.current?.style?.transform
+    if (transform)
+      dispatch(
+        updateAngle({
+          angle: transform
+            ?.match(/rotate(\(.+deg\))/gm)?.[0]
+            .split('.')[0]
+            ?.match(/([0-9]+)/gm)?.[0],
+        })
+      )
+  }, 20)
+  dispatch(setPlayerIntervalId(playerIntervalId))
+}, [dispatch])
+```
+
+## Animation Architecture
+
+Framer Motion powers all game animations with declarative syntax:
+
+- **Hexagon Rotation**: Infinite 360° rotation over 30 seconds (linear easing)
+- **Line Movement**: Lines animate from spawn point to center with scaling effects
+- **Player Movement**: CSS transform-based rotation controlled by keyboard input
+
+```tsx title="SuperHexagon Rotation Animation"
+<motion.div
+  ref={ref}
+  className='box relative'
+  initial={{ rotate: 0 }}
+  animate={{ rotate: 360 }}
+  transition={{ repeat: Infinity, duration: 30, ease: 'linear' }}
+>
+  {/* Game content */}
+</motion.div>
+```
+
+## Path Aliases
+
+The codebase uses TypeScript path aliases for clean imports:
+
+- `~components/*` → `src/components/*`
+- `~redux/*` → `src/redux/*`
+- `~helpers/*` → `src/helpers/*`
+- `~styles/*` → `src/styles/*`
+
+This keeps imports readable and makes refactoring easier.
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="State Management" href="/architecture/state-management" icon="database">
+    Learn about Redux slices, actions, and selectors
+  </Card>
+  <Card title="Components" href="/architecture/components" icon="layer-group">
+    Explore the atomic design component structure
+  </Card>
+</CardGroup>

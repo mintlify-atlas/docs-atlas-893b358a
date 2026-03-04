@@ -1,0 +1,251 @@
+---
+title: 'Player Controllers'
+description: 'Handle keyboard input and control player rotation in Super Hexagon'
+---
+
+## Overview
+
+The player controllers manage keyboard input for left and right arrow keys, updating the player's rotation angle continuously. The player rotates around the center of the hexagon at a constant speed of 2 degrees per frame.
+
+## Core Functions
+
+### keyDownHandler
+
+Handles keyboard keydown events to set the player movement state. When an arrow key is pressed, the corresponding direction is activated and the opposite direction is deactivated.
+
+<ParamField path="key" type="string" required>
+  The keyboard key that was pressed (e.g., "ArrowLeft" or "ArrowRight")
+</ParamField>
+
+<ParamField path="setLeftHeld" type="function" required>
+  React state setter function to update the left arrow key held state
+</ParamField>
+
+<ParamField path="setRightHeld" type="function" required>
+  React state setter function to update the right arrow key held state
+</ParamField>
+
+```typescript
+import { keyDownHandler } from '~/helpers/playerControllers'
+import { useState, useEffect } from 'react'
+
+function GameComponent() {
+  const [leftHeld, setLeftHeld] = useState(false)
+  const [rightHeld, setRightHeld] = useState(false)
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      keyDownHandler({
+        key: e.key,
+        setLeftHeld,
+        setRightHeld,
+      })
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [])
+
+  // Rest of component...
+}
+```
+
+### keyUpHandler
+
+Handles keyboard keyup events to release the player movement state. When an arrow key is released, that direction's held state is set to false.
+
+<ParamField path="key" type="string" required>
+  The keyboard key that was released (e.g., "ArrowLeft" or "ArrowRight")
+</ParamField>
+
+<ParamField path="setLeftHeld" type="function" required>
+  React state setter function to update the left arrow key held state
+</ParamField>
+
+<ParamField path="setRightHeld" type="function" required>
+  React state setter function to update the right arrow key held state
+</ParamField>
+
+```typescript
+import { keyUpHandler } from '~/helpers/playerControllers'
+
+useEffect(() => {
+  const handleKeyUp = (e: KeyboardEvent) => {
+    keyUpHandler({
+      key: e.key,
+      setLeftHeld,
+      setRightHeld,
+    })
+  }
+
+  window.addEventListener('keyup', handleKeyUp)
+  return () => window.removeEventListener('keyup', handleKeyUp)
+}, [])
+```
+
+### playerController
+
+Updates the player's rotation based on the current held key states. This function is called continuously (typically in `requestAnimationFrame`) to rotate the player smoothly.
+
+<ParamField path="leftHeld" type="boolean" required>
+  Whether the left arrow key is currently held down
+</ParamField>
+
+<ParamField path="rightHeld" type="boolean" required>
+  Whether the right arrow key is currently held down
+</ParamField>
+
+<ParamField path="degres" type="number" required>
+  Current rotation angle in degrees
+</ParamField>
+
+<ParamField path="setDegres" type="function" required>
+  React state setter function to update the rotation angle
+</ParamField>
+
+<ParamField path="el" type="HTMLDivElement | null" required>
+  The player DOM element to apply the rotation transform to
+</ParamField>
+
+```typescript
+import { playerController } from '~/helpers/playerControllers'
+import { useRef, useEffect } from 'react'
+
+function Player() {
+  const [degres, setDegres] = useState(0)
+  const [leftHeld, setLeftHeld] = useState(false)
+  const [rightHeld, setRightHeld] = useState(false)
+  const playerRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const gameLoop = () => {
+      playerController({
+        leftHeld,
+        rightHeld,
+        degres,
+        setDegres,
+        el: playerRef.current,
+      })
+      requestAnimationFrame(gameLoop)
+    }
+
+    const animationId = requestAnimationFrame(gameLoop)
+    return () => cancelAnimationFrame(animationId)
+  }, [leftHeld, rightHeld, degres])
+
+  return <div ref={playerRef} className="player" />
+}
+```
+
+## Movement Mechanics
+
+### Rotation Speed
+
+The player rotates at a fixed speed of **2 degrees per frame**:
+- **Left arrow**: Decreases angle by 2° (`degres - 2`)
+- **Right arrow**: Increases angle by 2° (`degres + 2`)
+
+At 60 FPS, this translates to 120 degrees per second, or one full rotation every 3 seconds.
+
+### Mutual Exclusivity
+
+The key handlers ensure only one direction can be active at a time:
+
+```typescript
+if (key === 'ArrowLeft') {
+  setLeftHeld(true)
+  setRightHeld(false)  // Deactivate opposite direction
+}
+```
+
+This prevents conflicting inputs and ensures predictable player behavior.
+
+### CSS Transform Application
+
+The rotation is applied directly to the DOM element using CSS transforms:
+
+```typescript
+el.style.transform = `rotate(${degres}deg)`
+```
+
+This leverages hardware acceleration for smooth visual rotation.
+
+## Complete Implementation Example
+
+```typescript
+import { useState, useEffect, useRef } from 'react'
+import {
+  keyDownHandler,
+  keyUpHandler,
+  playerController,
+} from '~/helpers/playerControllers'
+
+export default function SuperHexagonGame() {
+  const [degres, setDegres] = useState(0)
+  const [leftHeld, setLeftHeld] = useState(false)
+  const [rightHeld, setRightHeld] = useState(false)
+  const playerRef = useRef<HTMLDivElement>(null)
+
+  // Set up keyboard event listeners
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      keyDownHandler({ key: e.key, setLeftHeld, setRightHeld })
+    }
+
+    const handleKeyUp = (e: KeyboardEvent) => {
+      keyUpHandler({ key: e.key, setLeftHeld, setRightHeld })
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    window.addEventListener('keyup', handleKeyUp)
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown)
+      window.removeEventListener('keyup', handleKeyUp)
+    }
+  }, [])
+
+  // Game loop for continuous rotation
+  useEffect(() => {
+    const gameLoop = () => {
+      playerController({
+        leftHeld,
+        rightHeld,
+        degres,
+        setDegres,
+        el: playerRef.current,
+      })
+      requestAnimationFrame(gameLoop)
+    }
+
+    const animationId = requestAnimationFrame(gameLoop)
+    return () => cancelAnimationFrame(animationId)
+  }, [leftHeld, rightHeld, degres])
+
+  return (
+    <div className="game-container">
+      <div ref={playerRef} className="player" />
+    </div>
+  )
+}
+```
+
+## Type Definitions
+
+```typescript
+import { SetStateAction } from 'react'
+
+type KeyHandlerParams = {
+  key: string
+  setLeftHeld: (value: SetStateAction<boolean>) => void
+  setRightHeld: (value: SetStateAction<boolean>) => void
+}
+
+type PlayerControllerParams = {
+  leftHeld: boolean
+  rightHeld: boolean
+  degres: number
+  setDegres: (value: SetStateAction<number>) => void
+  el: HTMLDivElement | null
+}
+```

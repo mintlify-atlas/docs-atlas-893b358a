@@ -1,0 +1,276 @@
+---
+title: Development Setup
+description: Set up your local development environment for Super Hexagon
+---
+
+## Overview
+
+Super Hexagon is built with Next.js 13, React 18, TypeScript, and Redux Toolkit. This guide walks you through setting up your local development environment.
+
+## Prerequisites
+
+Before you begin, ensure you have the following installed:
+
+- **Node.js** 16.x or later
+- **npm** or **yarn** package manager
+- A modern code editor (VS Code recommended)
+
+## Installation
+
+<Steps>
+  <Step title="Clone the repository">
+    Clone the Super Hexagon repository to your local machine:
+    
+    ```bash
+    git clone <repository-url>
+    cd superhexagon
+    ```
+  </Step>
+
+  <Step title="Install dependencies">
+    Install all required dependencies using npm:
+    
+    ```bash
+    npm install
+    ```
+    
+    This will install the following key dependencies:
+    - **Next.js 13.4.12** - React framework
+    - **React 18.2.0** - UI library
+    - **Redux Toolkit 1.9.5** - State management
+    - **Framer Motion 10.13.1** - Animation library
+    - **Tailwind CSS 3.3.3** - Utility-first CSS framework
+    - **TypeScript 5.1.6** - Type safety
+  </Step>
+
+  <Step title="Start the development server">
+    Run the development server:
+    
+    ```bash
+    npm run dev
+    ```
+    
+    The application will be available at `http://localhost:3000`
+  </Step>
+</Steps>
+
+## Project Structure
+
+The project follows a modular architecture with organized component hierarchy:
+
+```
+src/
+├── app/                    # Next.js 13 app directory
+│   ├── layout.tsx         # Root layout with StoreProvider
+│   └── page.tsx           # Main entry point
+├── components/
+│   ├── atoms/             # Basic components (Score, Audio)
+│   ├── molecules/         # Composite components (Player, Line)
+│   └── organisms/         # Complex components (Game, Menu, SuperHexagon)
+├── redux/
+│   ├── slices/            # Redux state slices
+│   ├── selectors/         # State selectors
+│   ├── Provider/          # Redux store provider
+│   └── store.ts           # Store configuration
+├── helpers/
+│   ├── playerControllers.ts    # Player movement logic
+│   └── collisionControllers.ts # Collision detection
+├── styles/
+│   └── globals.css        # Global styles and custom CSS
+└── types/                 # TypeScript type definitions
+```
+
+## TypeScript Configuration
+
+The project uses strict TypeScript settings for type safety. The `tsconfig.json` includes path aliases for cleaner imports:
+
+```json
+{
+  "compilerOptions": {
+    "target": "es5",
+    "lib": ["dom", "dom.iterable", "esnext"],
+    "strict": true,
+    "paths": {
+      "~components/*": ["./src/components/*"],
+      "~styles/*": ["./src/styles/*"],
+      "~redux/*": ["./src/redux/*"],
+      "~helpers/*": ["./src/helpers/*"],
+      "~types/*": ["./src/types/*"]
+    }
+  }
+}
+```
+
+You can import modules using these aliases:
+
+```tsx
+import { Player } from '~components/molecules/Player'
+import { selectScore } from '~redux/selectors/score'
+import { updatePosition } from '~redux/slices/game'
+```
+
+## Next.js Configuration
+
+The project uses a minimal Next.js configuration in `next.config.js`:
+
+```javascript
+/** @type {import('next').NextConfig} */
+const nextConfig = {}
+
+module.exports = nextConfig
+```
+
+<Tip>
+You can extend this configuration to add environment variables, image optimization settings, or custom webpack configuration as needed.
+</Tip>
+
+## Tailwind CSS Setup
+
+Tailwind CSS is configured to scan all component files:
+
+```javascript
+// tailwind.config.js
+module.exports = {
+  content: [
+    './src/pages/**/*.{js,ts,jsx,tsx,mdx}',
+    './src/components/**/*.{js,ts,jsx,tsx,mdx}',
+    './src/app/**/*.{js,ts,jsx,tsx,mdx}',
+  ],
+  theme: {
+    extend: {
+      backgroundImage: {
+        'gradient-radial': 'radial-gradient(var(--tw-gradient-stops))',
+        'gradient-conic': 'conic-gradient(from 180deg at 50% 50%, var(--tw-gradient-stops))',
+      },
+    },
+  },
+  plugins: [],
+}
+```
+
+## Redux Store Configuration
+
+The Redux store is configured with a single game slice:
+
+```typescript
+// src/redux/store.ts
+import { configureStore } from '@reduxjs/toolkit'
+import gameReducer from './slices/game'
+
+export const store = configureStore({
+  reducer: {
+    game: gameReducer,
+  },
+})
+
+export type RootState = ReturnType<typeof store.getState>
+export type AppDispatch = typeof store.dispatch
+```
+
+The store is provided at the root level in `layout.tsx`:
+
+```tsx
+// src/app/layout.tsx
+import { StoreProvider } from '~redux/Provider/StoreProvider'
+
+export default function RootLayout({ children }) {
+  return (
+    <html lang='en'>
+      <body>
+        <StoreProvider>{children}</StoreProvider>
+      </body>
+    </html>
+  )
+}
+```
+
+## Development Scripts
+
+The following npm scripts are available:
+
+| Script | Command | Description |
+|--------|---------|-------------|
+| **dev** | `npm run dev` | Start development server at localhost:3000 |
+| **build** | `npm run build` | Build production bundle |
+| **start** | `npm start` | Start production server |
+| **lint** | `npm run lint` | Run ESLint for code quality |
+
+## Environment Variables
+
+The game uses the `NEXT_PUBLIC_HOST` environment variable for audio assets. Create a `.env.local` file:
+
+```bash
+NEXT_PUBLIC_HOST=http://localhost:3000
+```
+
+<Warning>
+Environment variables prefixed with `NEXT_PUBLIC_` are exposed to the browser. Never store sensitive information in these variables.
+</Warning>
+
+## Development Tips
+
+### Hot Reloading
+
+Next.js provides fast refresh during development. Changes to components automatically reload without losing state.
+
+### Type Checking
+
+Run TypeScript compiler in watch mode for continuous type checking:
+
+```bash
+npx tsc --noEmit --watch
+```
+
+### Debugging
+
+Use browser DevTools to debug the application:
+
+1. Open Chrome/Firefox DevTools (F12)
+2. Use React Developer Tools extension for component inspection
+3. Use Redux DevTools extension for state debugging
+
+### Code Quality
+
+The project includes ESLint with Next.js recommended configuration:
+
+```bash
+npm run lint
+```
+
+Fix linting issues automatically:
+
+```bash
+npm run lint -- --fix
+```
+
+## Troubleshooting
+
+### Port Already in Use
+
+If port 3000 is already in use, specify a different port:
+
+```bash
+PORT=3001 npm run dev
+```
+
+### Module Not Found
+
+If you encounter module resolution errors, ensure TypeScript paths are correctly configured and try restarting the development server.
+
+### Build Errors
+
+Clear the Next.js cache and rebuild:
+
+```bash
+rm -rf .next
+npm run build
+```
+
+## Next Steps
+
+Now that your development environment is set up, you can:
+
+- [Customize game parameters](/development/customization)
+- [Deploy to production](/development/deployment)
+- Explore the game state management in `src/redux/slices/game.ts`
+- Modify animations in components using Framer Motion

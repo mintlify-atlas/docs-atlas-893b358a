@@ -1,0 +1,335 @@
+---
+title: 'SuperHexagon'
+description: 'Main game canvas component featuring rotating hexagon, obstacle spawning, and player positioning'
+icon: 'hexagon'
+---
+
+## Overview
+
+The `SuperHexagon` component is the core game engine that renders the playable hexagon arena. It manages the rotating visual field, spawns obstacles at intervals, tracks player rotation angle, and handles collision detection.
+
+## Location
+
+`src/components/organisms/Superhexagon/SuperHexagon.tsx`
+
+## Key Features
+
+- **Rotating Arena**: 360-degree continuous rotation using Framer Motion
+- **Dynamic Obstacle Spawning**: Interval-based line generation with random gaps
+- **Angle Tracking**: Real-time rotation angle updates to Redux
+- **Six Triangle Zones**: Hexagonal structure divided into 6 triangular sections
+- **Collision Audio**: Pre-loaded game over sound effect
+
+## Implementation
+
+### Core Structure
+
+```tsx
+import { motion } from 'framer-motion'
+import { useCallback, useEffect, useMemo, useRef } from 'react'
+import { createRoot } from 'react-dom/client'
+import { useDispatch } from 'react-redux'
+import { Line } from '~components/molecules/Line'
+import { Player } from '~components/molecules/Player'
+import { StoreProvider } from '~redux/Provider/StoreProvider'
+import {
+  setPlayerIntervalId,
+  setSpawnIntervalId,
+  updateAngle,
+} from '~redux/slices/game'
+
+export const SuperHexagon = () => {
+  const ref = useRef<HTMLDivElement>(null)
+  const dispatch = useDispatch()
+
+  const t1 = useRef<HTMLDivElement>(null)
+  const t2 = useRef<HTMLDivElement>(null)
+  const t3 = useRef<HTMLDivElement>(null)
+  const t4 = useRef<HTMLDivElement>(null)
+  const t5 = useRef<HTMLDivElement>(null)
+  const t6 = useRef<HTMLDivElement>(null)
+
+  const triangles = useMemo(() => new Array(t1, t2, t3, t4, t5, t6), [])
+
+  // ... spawn and angle tracking logic
+}
+```
+
+## Props
+
+This component accepts no props. All state is managed through Redux and internal refs.
+
+## Refs and References
+
+The component uses multiple refs to manage DOM elements:
+
+<ParamField path="ref" type="RefObject<HTMLDivElement>">
+  Reference to the rotating container div. Used to extract the current rotation angle via CSS transform parsing.
+</ParamField>
+
+<ParamField path="t1-t6" type="RefObject<HTMLDivElement>">
+  Six refs representing each triangular section of the hexagon. Used as parent containers for spawning Line obstacles.
+</ParamField>
+
+<ParamField path="triangles" type="Array<RefObject<HTMLDivElement>>">
+  Memoized array of all six triangle refs. Prevents re-creation on every render.
+</ParamField>
+
+<ParamField path="audio" type="HTMLAudioElement">
+  Memoized audio element for game over sound. Loaded from `/game-over.wav` and passed to Line components for collision events.
+</ParamField>
+
+## Obstacle Spawning Logic
+
+The component spawns obstacles every 1.8 seconds using a sophisticated randomization system:
+
+```tsx
+const handleSpawn = useCallback(() => {
+  const randomId = Math.floor(Math.random() * 6)
+
+  triangles.map((triangle, idx) => {
+    if (idx === randomId) return // Skip one random triangle = gap
+    const div = document.createElement('div')
+    div.className = 'h-0'
+    createRoot(div).render(
+      <StoreProvider>
+        <Line audio={audio} />
+      </StoreProvider>
+    )
+    triangle.current?.appendChild(div)
+  })
+}, [triangles, audio])
+
+useEffect(() => {
+  const spawnIntervalId = setInterval(handleSpawn, 1800)
+  dispatch(setSpawnIntervalId(spawnIntervalId))
+}, [dispatch, handleSpawn])
+```
+
+### Spawning Process
+
+1. **Random Gap Selection**: Choose a random number 0-5 to determine which triangle section will be the gap
+2. **Line Creation**: For each non-gap triangle, create a new div container with `h-0` class
+3. **React Root Injection**: Use `createRoot()` to render a `<Line>` component with Redux provider
+4. **DOM Append**: Attach the Line to the triangle ref's DOM node
+5. **Interval Storage**: Store interval ID in Redux for cleanup on game over
+
+<Note>
+  Each Line component spawns with its own StoreProvider to ensure Redux connectivity. The Line animates inward and self-destructs upon reaching the center hexagon.
+</Note>
+
+## Angle Tracking System
+
+The component continuously monitors the rotation angle and syncs it to Redux:
+
+```tsx
+useEffect(() => {
+  const playerIntervalId = setInterval(() => {
+    const transform = ref.current?.style?.transform
+    if (transform)
+      dispatch(
+        updateAngle({
+          angle: transform
+            ?.match(/rotate\(.+deg\)/gm)?.[0]
+            .split('.')[0]
+            ?.match(/([0-9]+)/gm)?.[0],
+        })
+      )
+  }, 20) // Updates every 20ms = 50 times per second
+  dispatch(setPlayerIntervalId(playerIntervalId))
+}, [dispatch])
+```
+
+### Angle Extraction Process
+
+1. **Read Transform**: Access the CSS `transform` style from the rotating container ref
+2. **Regex Match**: Extract the `rotate(Xdeg)` value using regex pattern `/rotate\(.+deg\)/gm`
+3. **Parse Number**: Split on decimal and extract integer portion of degrees
+4. **Dispatch to Redux**: Update global `angle` state for collision detection
+5. **High Frequency**: Updates 50 times per second (every 20ms) for smooth tracking
+
+<Warning>
+  The angle is stored as a string in Redux due to the parsing logic. Components using this value should convert it to a number when needed.
+</Warning>
+
+## Rotation Animation
+
+The arena uses Framer Motion for smooth, infinite rotation:
+
+```tsx
+<motion.div
+  ref={ref}
+  className='box relative'
+  initial={{ rotate: 0 }}
+  animate={{ rotate: 360 }}
+  transition={{ repeat: Infinity, duration: 30, ease: 'linear' }}
+>
+  {/* hexagon structure */}
+</motion.div>
+```
+
+<ParamField path="initial" type="object">
+  Starting rotation angle: `{ rotate: 0 }`
+</ParamField>
+
+<ParamField path="animate" type="object">
+  Target rotation: `{ rotate: 360 }` (full circle)
+</ParamField>
+
+<ParamField path="transition" type="object">
+  - `repeat: Infinity` - Never stops rotating
+  - `duration: 30` - One full rotation takes 30 seconds
+  - `ease: 'linear'` - Constant speed (no acceleration)
+</ParamField>
+
+## Hexagon Structure
+
+The visual hexagon consists of two layered elements:
+
+```tsx
+<div className='hexagon absolute w-[92px] h-20 left-0 right-0 top-[calc(50vh_-_40px)] ml-auto mr-auto bg-orange-500'></div>
+<div className='hexagon absolute w-[81px] h-[70px] left-0 right-0 top-[calc(50vh_-_35px)] ml-auto mr-auto  bg-[#de0000]'></div>
+```
+
+### Hexagon Layers
+
+<CardGroup cols={2}>
+  <Card title="Outer Hexagon" icon="hexagon">
+    - Width: 92px
+    - Height: 80px
+    - Color: Orange (#f5914a variant)
+    - Positioned at viewport center
+  </Card>
+  <Card title="Inner Hexagon" icon="hexagon">
+    - Width: 81px
+    - Height: 70px
+    - Color: Red (#de0000)
+    - Creates nested visual effect
+  </Card>
+</CardGroup>
+
+## Triangle Container System
+
+The six triangular sections are rendered dynamically:
+
+```tsx
+{triangles.map((triangle, idx) => (
+  <div
+    key={idx}
+    ref={triangle}
+    className='triangle top-[calc(50vh_-_260px)]'
+  ></div>
+))}
+```
+
+Each triangle:
+- Uses the `.triangle` CSS class for shape styling
+- Positioned `260px` above viewport center
+- Serves as a container for spawned Line components
+- Maintains its own ref for targeted obstacle injection
+
+## Player Component
+
+The SuperHexagon renders the Player component outside the rotating container:
+
+```tsx
+<Player />
+```
+
+This separation ensures the player triangle remains stationary while the hexagon rotates beneath it. The Player component handles:
+- User input (left/right arrow keys)
+- Position updates based on rotation state
+- Collision detection with Line obstacles
+
+## State Interactions
+
+The component interacts with Redux through these actions:
+
+<CodeGroup>
+
+```typescript setSpawnIntervalId
+dispatch(setSpawnIntervalId(spawnIntervalId))
+// Stores interval ID for cleanup on game over
+```
+
+```typescript setPlayerIntervalId
+dispatch(setPlayerIntervalId(playerIntervalId))
+// Stores interval ID for cleanup on game over
+```
+
+```typescript updateAngle
+dispatch(updateAngle({ angle: '45' }))
+// Updates rotation angle for collision calculations
+```
+
+</CodeGroup>
+
+## Cleanup and Memory Management
+
+The component stores interval IDs in Redux to enable proper cleanup:
+
+1. **Spawn Interval**: Cleared when game ends to stop obstacle generation
+2. **Player Interval**: Cleared when game ends to stop angle updates
+3. **Line Components**: Self-destruct after animation completes or collision occurs
+
+<Note>
+  The interval cleanup happens in the collision handler (Line component) when `pause()` action is dispatched. This prevents memory leaks and stops game logic immediately on game over.
+</Note>
+
+## Usage Example
+
+The SuperHexagon is conditionally rendered by the Game organism:
+
+```tsx
+import { SuperHexagon } from '~components/organisms/Superhexagon'
+import { useSelector } from 'react-redux'
+import { selectIsPLaying } from '~redux/selectors/isPlaying'
+
+export const Game = () => {
+  const isPlaying = useSelector(selectIsPLaying)
+  return (
+    <>
+      {isPlaying && <SuperHexagon />}
+      {/* other game components */}
+    </>
+  )
+}
+```
+
+## Performance Considerations
+
+### Memoization
+
+- **triangles array**: Memoized with `useMemo` to prevent re-creation
+- **audio element**: Memoized to avoid re-loading sound file
+- **handleSpawn callback**: Memoized with `useCallback` to stabilize dependency array
+
+### Interval Frequencies
+
+- **Spawn interval**: 1800ms (every 1.8 seconds)
+- **Angle update interval**: 20ms (50 updates per second)
+- **Rotation duration**: 30 seconds per full cycle
+
+### DOM Manipulation
+
+The component uses direct DOM manipulation (`createElement`, `appendChild`) for obstacle spawning rather than React state. This decision:
+- Avoids re-rendering the entire hexagon on each spawn
+- Allows precise control over Line component lifecycle
+- Reduces React reconciliation overhead
+
+## Related Documentation
+
+<CardGroup cols={2}>
+  <Card title="Line Component" icon="minus">
+    Learn about obstacle animation and collision detection
+  </Card>
+  <Card title="Player Component" icon="play">
+    Understand player controls and hitbox logic
+  </Card>
+  <Card title="Game Component" icon="gamepad" href="./game">
+    See how SuperHexagon fits into the game state
+  </Card>
+  <Card title="Redux Game Slice" icon="store">
+    Explore the state management architecture
+  </Card>
+</CardGroup>

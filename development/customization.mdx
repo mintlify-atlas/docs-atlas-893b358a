@@ -1,0 +1,430 @@
+---
+title: Customization Guide
+description: Learn how to customize game mechanics, visuals, and behavior in Super Hexagon
+---
+
+## Overview
+
+Super Hexagon is highly customizable. You can modify game speed, colors, difficulty, player behavior, and obstacle patterns. This guide shows you how to customize various aspects of the game.
+
+## Game Speed & Difficulty
+
+### Rotation Speed
+
+The hexagon rotation speed is controlled in `SuperHexagon.tsx`:
+
+```tsx src/components/organisms/Superhexagon/SuperHexagon.tsx
+<motion.div
+  ref={ref}
+  className='box relative'
+  initial={{ rotate: 0 }}
+  animate={{ rotate: 360 }}
+  transition={{ 
+    repeat: Infinity, 
+    duration: 30,  // Decrease for faster rotation
+    ease: 'linear' 
+  }}
+>
+```
+
+**Adjusting difficulty:**
+- `duration: 30` - Easy (default)
+- `duration: 20` - Medium
+- `duration: 15` - Hard
+- `duration: 10` - Extreme
+
+### Obstacle Spawn Rate
+
+Control how frequently obstacles spawn:
+
+```tsx src/components/organisms/Superhexagon/SuperHexagon.tsx
+useEffect(() => {
+  const spawnIntervalId = setInterval(handleSpawn, 1800) // milliseconds
+  dispatch(setSpawnIntervalId(spawnIntervalId))
+}, [dispatch, handleSpawn])
+```
+
+**Spawn rate adjustments:**
+- `1800` - Normal (default)
+- `1200` - Fast
+- `2400` - Slow
+- `900` - Very fast
+
+<Warning>
+Spawn rates below 1000ms can make the game extremely difficult and may cause performance issues.
+</Warning>
+
+### Obstacle Speed
+
+The obstacle animation speed is controlled in the `Line` component:
+
+```tsx src/components/molecules/Line/Line.tsx
+<motion.div
+  ref={ref}
+  initial={{ y: 0 }}
+  animate={{ 
+    y: 255,         // Distance traveled
+    scaleY: 0.2,    // Vertical scale
+    scaleX: 0       // Horizontal scale
+  }}
+  transition={{ 
+    duration: 12,   // Speed of obstacle movement
+    ease: 'linear' 
+  }}
+  className='relative w-full h-3 bg-orange-500'
+>
+```
+
+**Speed adjustments:**
+- Decrease `duration` for faster obstacles
+- Increase `y` value for longer travel distance
+- Adjust `scaleY` and `scaleX` for different visual effects
+
+## Player Controls
+
+### Movement Speed
+
+Modify player rotation speed in `playerControllers.ts`:
+
+```typescript src/helpers/playerControllers.ts
+export const playerController = ({
+  leftHeld,
+  rightHeld,
+  degres,
+  setDegres,
+  el,
+}) => {
+  if (leftHeld && el) {
+    setDegres(degres - 2)  // Increase for faster rotation
+    el.style.transform = `rotate(${degres}deg)`
+  }
+  if (rightHeld && el) {
+    setDegres(degres + 2)  // Increase for faster rotation
+    el.style.transform = `rotate(${degres}deg)`
+  }
+}
+```
+
+**Sensitivity adjustments:**
+- `2` - Normal (default)
+- `3` - Fast
+- `4` - Very fast
+- `1.5` - Slow/Precise
+
+### Control Update Rate
+
+Adjust the player control polling frequency:
+
+```tsx src/components/molecules/Player/Player.tsx
+useEffect(() => {
+  setTimeout(() => {
+    playerController({
+      leftHeld,
+      rightHeld,
+      degres,
+      setDegres,
+      el: ref.current,
+    })
+  }, 10)  // Milliseconds between updates
+}, [degres, leftHeld, rightHeld])
+```
+
+Lower values = more responsive controls, but higher CPU usage.
+
+### Custom Key Bindings
+
+Modify key bindings in `playerControllers.ts`:
+
+```typescript src/helpers/playerControllers.ts
+export const keyDownHandler = ({ key, setLeftHeld, setRightHeld }) => {
+  // Add custom keys
+  if (key === 'ArrowLeft' || key === 'a' || key === 'A') {
+    setLeftHeld(true)
+    setRightHeld(false)
+  }
+  if (key === 'ArrowRight' || key === 'd' || key === 'D') {
+    setRightHeld(true)
+    setLeftHeld(false)
+  }
+}
+```
+
+## Color Schemes
+
+### Hexagon Background Colors
+
+The hexagon triangles are styled in `globals.css` with alternating colors:
+
+```css src/styles/globals.css
+.box > div:nth-child(1){
+  background-color: #de0000;  /* Red */
+  transform: rotate(0deg);
+}
+.box > div:nth-child(2){
+  background-color: #de4300;  /* Orange */
+  transform: rotate(60deg);
+}
+.box > div:nth-child(3){
+  background-color: #de0000;  /* Red */
+  transform: rotate(120deg);
+}
+/* ... continues for all 6 triangles */
+```
+
+**Create a custom color scheme:**
+
+```css
+/* Blue theme */
+.box > div:nth-child(odd) {
+  background-color: #1e40af;  /* Dark blue */
+}
+.box > div:nth-child(even) {
+  background-color: #3b82f6;  /* Light blue */
+}
+```
+
+### Obstacle Colors
+
+Change obstacle colors in the `Line` component:
+
+```tsx src/components/molecules/Line/Line.tsx
+<motion.div
+  className='relative w-full h-3 bg-orange-500'  // Change color here
+>
+```
+
+Use any Tailwind color class:
+- `bg-red-500`
+- `bg-blue-500`
+- `bg-purple-500`
+- `bg-green-500`
+
+### Player Color
+
+Modify the player triangle color:
+
+```tsx src/components/molecules/Player/Player.tsx
+<div className='player'>
+  <div className='relative cursor bg-[red]'>  {/* Change color */}
+    {/* Hitbox elements */}
+  </div>
+</div>
+```
+
+### Background Color
+
+Change the main background in `SuperHexagon.tsx`:
+
+```tsx
+<div className='overflow-hidden bg-[#f5914a]'>  {/* Background color */}
+  <motion.div className='box relative'>
+    {/* Game content */}
+  </motion.div>
+</div>
+```
+
+## Score System
+
+### Score Increment Rate
+
+The score increments when obstacles are successfully avoided. Modify the timeout in `Line.tsx`:
+
+```tsx src/components/molecules/Line/Line.tsx
+useEffect(() => {
+  const timeoutId = setTimeout(() => {
+    ref.current && ref.current.parentElement?.remove()
+    setShouldRender(false)
+    dispatch(updateScore())  // Increments score by 1
+  }, 12000)  // Match this with obstacle animation duration
+  setTimeoutId(timeoutId)
+}, [dispatch])
+```
+
+### Custom Score Multipliers
+
+Modify the score increment logic in `game.ts` slice:
+
+```typescript src/redux/slices/game.ts
+updateScore: (state) => {
+  state.score += 1  // Change to += 10 for 10 points per obstacle
+}
+```
+
+Or add a multiplier based on game time:
+
+```typescript
+updateScore: (state, action: PayloadAction<number | undefined>) => {
+  const multiplier = action.payload ?? 1
+  state.score += 1 * multiplier
+}
+```
+
+## Styling with Tailwind CSS
+
+### Score Display
+
+Customize the score component appearance:
+
+```tsx src/components/atoms/Score/Score.tsx
+<div className='fixed w-14 h-14 top-3 right-3 text-3xl text-center p-2 
+              shadow-lg bg-black border-2 border-white rounded-md text-white'>
+  {score}
+</div>
+```
+
+**Customization options:**
+- Change position: `top-3 left-3` (top-left)
+- Increase size: `w-20 h-20 text-4xl`
+- Different style: `rounded-full bg-gradient-to-r from-purple-500 to-pink-500`
+
+### Menu Styling
+
+The menu uses Tailwind utilities with custom text shadows:
+
+```tsx src/components/organisms/Menu/Menu.tsx
+<h1 className='text-4xl mt-8 md:text-8xl md:mt-0 shadow-lg uppercase'>
+  SUPERHEXAGON
+</h1>
+```
+
+Custom text shadow is defined in `globals.css`:
+
+```css
+h1 {
+  @apply font-semibold text-3xl;
+  @apply tracking-[-0.035em];
+  text-shadow: 3px 3px 20px #ff99cc, -2px 1px 30px #ff99cc;
+}
+```
+
+<Tip>
+Use Tailwind's responsive prefixes (`sm:`, `md:`, `lg:`) to create responsive designs that work on mobile and desktop.
+</Tip>
+
+## Mobile Controls
+
+The mobile controls are conditionally rendered based on screen width:
+
+```tsx src/components/molecules/Player/Player.tsx
+const [isMobile, setIsMobile] = useState(false)
+
+useEffect(() => {
+  setIsMobile(window.innerWidth < 800)  // Adjust breakpoint
+}, [])
+
+{isMobile && (
+  <>
+    <button className='fixed bottom-6 left-6 w-16 h-16 
+                       rounded-full border-2 border-white bg-black'>
+      {/* Left control */}
+    </button>
+    <button className='fixed bottom-6 right-6 w-16 h-16 
+                       rounded-full border-2 border-white bg-black'>
+      {/* Right control */}
+    </button>
+  </>
+)}
+```
+
+**Customization:**
+- Change breakpoint: `window.innerWidth < 1024` for tablets
+- Reposition buttons: Adjust `bottom-6`, `left-6`, `right-6`
+- Resize buttons: Change `w-16 h-16` to larger/smaller
+- Add visual indicators (arrows, icons)
+
+## Collision Detection
+
+### Hitbox Sensitivity
+
+The collision detection uses three hitbox points on the player. The collision threshold is in `Line.tsx`:
+
+```tsx src/components/molecules/Line/Line.tsx
+setIsTouching(angle1 >= 360 || angle2 >= 360 || angle3 >= 360)
+```
+
+To make collision more forgiving, increase the threshold:
+
+```tsx
+setIsTouching(angle1 >= 365 || angle2 >= 365 || angle3 >= 365)
+```
+
+<Warning>
+Modifying collision detection significantly can make the game too easy or create unfair gameplay.
+</Warning>
+
+## Adding New Features
+
+### Power-ups
+
+Create a new power-up system:
+
+1. Add power-up state to Redux slice:
+```typescript
+type PlayerState = {
+  // ... existing state
+  activePowerUps: string[]
+  isInvincible: boolean
+}
+```
+
+2. Create a power-up component similar to `Line`
+3. Spawn power-ups randomly in `handleSpawn`
+4. Modify collision logic to handle power-up effects
+
+### Different Obstacle Types
+
+Create obstacles with different behaviors:
+
+```tsx
+// Fast obstacle
+<motion.div
+  animate={{ y: 255 }}
+  transition={{ duration: 6 }}  // Twice as fast
+/>
+
+// Pulsing obstacle
+<motion.div
+  animate={{ y: 255, scale: [1, 1.5, 1] }}
+  transition={{ duration: 12 }}
+/>
+```
+
+### Difficulty Progression
+
+Implement increasing difficulty over time:
+
+```tsx
+const [spawnRate, setSpawnRate] = useState(1800)
+
+useEffect(() => {
+  const difficultyInterval = setInterval(() => {
+    setSpawnRate(prev => Math.max(800, prev - 100))  // Increase speed
+  }, 30000)  // Every 30 seconds
+  
+  return () => clearInterval(difficultyInterval)
+}, [])
+```
+
+## Testing Customizations
+
+After making changes:
+
+1. **Test in development mode:**
+   ```bash
+   npm run dev
+   ```
+
+2. **Check for TypeScript errors:**
+   ```bash
+   npx tsc --noEmit
+   ```
+
+3. **Test responsive design** at different screen sizes
+4. **Test on mobile devices** for touch controls
+5. **Check performance** with browser DevTools Performance tab
+
+## Next Steps
+
+- [Deploy your customized game](/development/deployment)
+- Explore animation options in the [Framer Motion docs](https://www.framer.com/motion/)
+- Learn more about [Tailwind CSS utilities](https://tailwindcss.com/docs)
