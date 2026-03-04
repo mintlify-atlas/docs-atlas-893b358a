@@ -1,0 +1,108 @@
+{
+  "projectType": "frontend",
+  "projectName": "Super Hexagon",
+  "projectDescription": "A browser-based recreation of the classic Super Hexagon game built with Next.js, React, and Framer Motion.",
+  "theme": "aspen",
+  "primaryColor": "#f5914a",
+  "lightColor": "#ff6b35",
+  "darkColor": "#de0000",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "introduction",
+              "quickstart",
+              "gameplay"
+            ]
+          },
+          {
+            "group": "Game Mechanics",
+            "pages": [
+              "mechanics/controls",
+              "mechanics/collision-detection",
+              "mechanics/scoring"
+            ]
+          },
+          {
+            "group": "Architecture",
+            "pages": [
+              "architecture/overview",
+              "architecture/state-management",
+              "architecture/components"
+            ]
+          },
+          {
+            "group": "Development",
+            "pages": [
+              "development/setup",
+              "development/customization",
+              "development/deployment"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Components",
+        "groups": [
+          {
+            "group": "Organisms",
+            "pages": [
+              "components/game",
+              "components/superhexagon",
+              "components/menu"
+            ]
+          },
+          {
+            "group": "Molecules",
+            "pages": [
+              "components/player",
+              "components/line"
+            ]
+          },
+          {
+            "group": "Atoms",
+            "pages": [
+              "components/audio",
+              "components/score"
+            ]
+          },
+          {
+            "group": "Utilities",
+            "pages": [
+              "components/collision-controllers",
+              "components/player-controllers",
+              "components/ray-casting"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Rotating hexagonal gameplay with collision detection",
+    "Redux-based game state management",
+    "Smooth animations using Framer Motion",
+    "Mobile touch controls support",
+    "Audio feedback and scoring system",
+    "Component-based architecture using atomic design"
+  ],
+  "publicApiSurface": [
+    "Game - Main game orchestration component",
+    "SuperHexagon - Core hexagon rendering and line spawning",
+    "Player - Player triangle with keyboard and touch controls",
+    "Line - Animated obstacle with collision detection",
+    "Audio - Background music and sound effects",
+    "Score - Real-time score display",
+    "Menu - Game menu and start screen",
+    "play() - Redux action to start the game",
+    "pause() - Redux action to pause the game",
+    "updateScore() - Redux action to increment score",
+    "updatePosition() - Redux action to update player position",
+    "handleCollision() - Collision detection algorithm",
+    "playerController() - Player movement logic"
+  ]
+}
